@@ -49,10 +49,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     # Metadata
     metadata = build_meta_from_files(data_dir)
     # Group_ID
-    if config['training']['uCT']:
-        metadata['subj_id'] = metadata.fname.apply(lambda x: x.stem.rsplit('_', 2)[0], 0)
-    else:
-        metadata['subj_id'] = metadata.fname.apply(lambda x: x.stem.rsplit('_', 3)[0], 0)
+    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
 
     # Mean and std
     crop = config['training']['crop_size']
@@ -70,13 +67,13 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     print('==> STD:', std)
 
     # Group K-Fold by rabbit ID
-    #gkf = model_selection.GroupKFold(n_splits=config['training']['n_folds'])
+    gkf = model_selection.GroupKFold(n_splits=config['training']['n_folds'])
     # K-fold by random shuffle
-    gkf = model_selection.KFold(n_splits=config['training']['n_folds'], shuffle=True, random_state=args.seed)
+    #gkf = model_selection.KFold(n_splits=config['training']['n_folds'], shuffle=True, random_state=args.seed)
 
     # Create splits for all folds
     splits_metadata = dict()
-    iterator = gkf.split(metadata, groups=metadata.subj_id)
+    iterator = gkf.split(metadata.fname.values, groups=metadata.subj_id.values)
     for fold in range(config['training']['n_folds']):
         train_idx, val_idx = next(iterator)
         splits_metadata[f'fold_{fold}'] = {'train': metadata.iloc[train_idx],

@@ -6,6 +6,7 @@ if __name__ == "__main__":
     # Initialize experiment
     args, config, device, snapshots_dir, snapshot_name = init_experiment()
     base_path = args.data_location / 'µCT'
+    #base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Should_be_resegmented_with_neural_network/New Manual CC segmentation')
     masks_loc = base_path / 'masks'
     images_loc = base_path / 'images'
 

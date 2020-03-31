@@ -2,7 +2,7 @@ training:
   # General
   wd: 0.0001
   lr: 0.0001
-  n_folds: 5
+  n_folds: 4
   crop_size: [512, 1024]
   uCT: True
   calc_meanstd: True
@@ -33,7 +33,7 @@ model:
   n_outputs: 1
   spatial_dropout: 0.1
   bayesian_dropout: 0.5
-  backbone: resnet50
+  backbone: resnet18
   decoder: FPN
 data_sampling:
   train:

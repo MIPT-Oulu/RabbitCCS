@@ -5,6 +5,7 @@ import numpy as np
 import time
 import socket
 import torch
+import torch.nn as nn
 import dill
 import json
 import cv2
@@ -33,9 +34,10 @@ def init_experiment(experiment='2D'):
     parser.add_argument('--workdir', type=pathlib.Path, default='../../../workdir/')
     parser.add_argument('--experiment', default='../experiments/experiment_config.yml')
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--model_unet', type=bool, default=False)
+    parser.add_argument('--model_unet', type=bool, default=True)
     parser.add_argument('--num_threads', type=int, default=16)
     parser.add_argument('--bs', type=int, default=5)
+    parser.add_argument('--gpus', type=int, default=2)
     parser.add_argument('--n_epochs', type=int, default=100)
     args = parser.parse_args()
 
@@ -43,8 +45,9 @@ def init_experiment(experiment='2D'):
         # µCT parameters
         args.data_location = args.data_location / 'µCT'
         args.experiment = '../experiments/experiment_config_uCT.yml'
-        args.bs = 5
-        args.n_epochs = 20
+        args.bs = 12
+        args.n_epochs = 60
+        #args.n_epochs = 50
         #args.model_unet = True
     elif experiment == '2D_large':
         args.data_location = args.data_location / 'human'
@@ -121,6 +124,8 @@ def init_loss(config, device='cuda'):
         return BCEWithLogitsLoss2d().to(device)
     elif config['training']['loss'] == 'jaccard':
         return SoftJaccardLoss(use_log=config['training']['log_jaccard']).to(device)
+    elif config['training']['loss'] == 'mse':
+        return nn.MSELoss.to(device)
     elif config['training']['loss'] == 'combined':
         return CombinedLoss([BCEWithLogitsLoss2d(),
                             SoftJaccardLoss(use_log=config['training']['log_jaccard'])]).to(device)
@@ -190,7 +195,10 @@ def parse_grayscale(root, entry, transform, data_key, target_key):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img[:, :, 1] = img[:, :, 0]
     img[:, :, 2] = img[:, :, 0]
-    mask = cv2.imread(str(entry.mask_fname), 0) / 255.
+    try:
+        mask = cv2.imread(str(entry.mask_fname), 0) / 255.
+    except TypeError:
+        raise Exception(str(entry.mask_fname))
 
     if img.shape[0] != mask.shape[0]:
         img = cv2.resize(img, (mask.shape[1], mask.shape[0]))

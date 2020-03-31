@@ -22,22 +22,24 @@ cv2.setNumThreads(0)
 
 if __name__ == "__main__":
     start = time()
-    pred_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Used in method manuscript for CC segmentation/')
+    #pred_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Used in method manuscript for CC segmentation/')
+    pred_path = Path('../../../Data/µCT/')
     #pred_path = Path('/media/dios/databank/Lingwei_Huang/Used in method manuscript for CC segmentation/')
     #snapshot = Path('dios-erc-gpu_2019_09_18_15_32_33_8samples')
     snapshot = Path('dios-erc-gpu_2019_09_27_16_08_10_12samples')
     #subdir = 'Largest_4fold'
-    subdir = 'Prediction_12samples'
+    #subdir = 'Prediction_12samples'
     #subdir = 'Automatic_CC_segmentation'
-    subdir_mask = 'Manual_CC_mask_after_smoothing'
+    #subdir_mask = 'Manual_CC_mask_after_smoothing'
 
     parser = argparse.ArgumentParser()
-    #parser.add_argument('--mask_path', type=Path, default='../../../Data/µCT/masks')
-    parser.add_argument('--mask_path', type=Path, default=pred_path)
-    parser.add_argument('--image_path', type=Path, default=pred_path)
-    parser.add_argument('--prediction_path', type=Path, default=pred_path)
-    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/images')
-    parser.add_argument('--eval_name', type=str, default='Automatic_CC_CTAn')
+    parser.add_argument('--mask_path', type=Path, default=pred_path / 'masks')
+    #parser.add_argument('--mask_path', type=Path, default=pred_path)
+    parser.add_argument('--image_path', type=Path, default=pred_path / 'images')
+    parser.add_argument('--prediction_path', type=Path, default=pred_path / 'predictions')
+    parser.add_argument('--save_dir', type=Path, default=pred_path / 'evaluation')
+    #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/images')
+    parser.add_argument('--eval_name', type=str, default='network')
     parser.add_argument('--n_threads', type=int, default=16)
     parser.add_argument('--n_labels', type=int, default=2)
     parser.add_argument('--experiment', default='./experiment_config_uCT.yml')
@@ -61,6 +63,7 @@ if __name__ == "__main__":
 
     # Loop for samples
     args.save_dir.mkdir(exist_ok=True)
+    (args.save_dir / 'visualizations').mkdir(exist_ok=True)
     #samples = [os.path.basename(x) for x in glob(str(args.mask_path / '*XZ'))]
     samples = os.listdir(str(args.mask_path))
     samples.sort()
@@ -72,12 +75,12 @@ if __name__ == "__main__":
             if 'subdir_mask' in locals():
                 mask, files_mask = load(str(args.mask_path / sample / subdir_mask), rgb=False, n_jobs=args.n_threads)
             else:
-                mask, files_mask = load(str(args.mask_path / sample), rgb=False, n_jobs=args.n_threads)
+                mask, files_mask = load(str(args.mask_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
             if 'subdir' in locals():
                 pred, files_pred = load(str(args.prediction_path / sample / subdir), rgb=False, n_jobs=args.n_threads)
             else:
-                pred, files_pred = load(str(args.prediction_path / sample), rgb=False, n_jobs=args.n_threads)
-            data, files_data = load(str(args.image_path / sample), rgb=False, n_jobs=args.n_threads)
+                pred, files_pred = load(str(args.prediction_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
+            data, files_data = load(str(args.image_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
 
             # Crop in case of inconsistency
             crop = min(pred.shape, mask.shape)
@@ -93,10 +96,14 @@ if __name__ == "__main__":
             print(f'Sample {sample}: dice = {dice}, IoU = {iou}, similarity = {sim}')
 
             # Save predicted full mask
+            """
             render_volume(np.bitwise_xor(pred, mask),
                           savepath=str(args.save_dir / 'visualizations' / (sample + '_difference.png')),
                           white=False, use_outline=False)
-
+            """
+            print_orthogonal(data, invert=False, res=3.2, title=None, cbar=True,
+                             savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
+                             scale_factor=1500)
             print_orthogonal(data, mask=mask, invert=False, res=3.2, title=None, cbar=True,
                              savepath=str(args.save_dir / 'visualizations' / (sample + '_reference.png')),
                              scale_factor=1500)
@@ -110,7 +117,6 @@ if __name__ == "__main__":
             results['IoU'].append(iou)
             results['Similarity'].append(sim)
 
-
         except Exception as e:
             print(f'Sample {sample} failing due to error:\n\n{e}\n!')
             continue
@@ -122,7 +128,7 @@ if __name__ == "__main__":
     results['Similarity'].append(np.average(results['Similarity']))
 
     # Write to excel
-    writer = pd.ExcelWriter(str(args.save_dir / 'evaluation' / ('metrics_' + str(snapshot) + '_' + args.eval_name)) + '.xlsx')
+    writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snapshot) + '_' + args.eval_name)) + '.xlsx')
     df1 = pd.DataFrame(results)
     df1.to_excel(writer, sheet_name='Metrics')
     writer.save()

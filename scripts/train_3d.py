@@ -45,8 +45,15 @@ if __name__ == "__main__":
         # Initialize model model
         if args.model_unet:
             model = smp.Unet(config['model']['backbone'], encoder_weights="imagenet", activation='sigmoid')
+            print('UNet selected')
         else:
-            model = EncoderDecoder(**config['model']).to(device)
+            model = EncoderDecoder(**config['model'])
+            print('EncoderDecoder selected')
+        if args.gpus > 1:
+            model = nn.DataParallel(model).to(device)
+        else:
+            model = model.to(device)
+
         # Optimizer
         optimizer = optim.Adam(model.parameters(),
                                lr=config['training']['lr'],

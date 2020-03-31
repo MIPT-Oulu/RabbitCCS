@@ -90,7 +90,7 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_gray)(path, file) for file in files)
     # Transpose array
     if axis != (0, 1, 2):
-        return np.transpose(np.array(data), axis)
+        return np.transpose(np.array(data), axis), files
 
     return np.array(data), files
 

@@ -27,17 +27,22 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL')
-    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_CTRL_new')
+    #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL_crop_manual')
+    parser.add_argument('--dataset_root', type=Path, default='../../../Data/µCT/images')
+    #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_CTRL_crop_outoffold_0.5')
+    parser.add_argument('--save_dir', type=Path, default='../../../Data/µCT/predictions_outoffold')
     #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Matched histology (corrected)')
     #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Matched histology (corrected)/prediction')
     #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/SDG_DIC/Main')
     #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/SDG_DIC/Predictions')
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
+    parser.add_argument('--gpus', type=int, default=2)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
-    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_10_07_12_04_00_new_trfs/')
-    #parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_09_27_16_08_10_12samples/')
+    # Histology snapshot
+    #parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_11_19_15_45_01_hist_validation/')
+    # µCT snapshot
+    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_02_07_10_42_31_14samples/')
     args = parser.parse_args()
 
     # Load snapshot configuration
@@ -58,11 +63,15 @@ if __name__ == "__main__":
     # List the models
     model_list = []
     for fold in range(len(models)):
-        model = EncoderDecoder(**config['model']).to(device)
+        model = EncoderDecoder(**config['model'])
+        if args.gpus > 1:
+            model = torch.nn.DataParallel(model).to(device)
+        else:
+            model = model.to(device)
         model.load_state_dict(torch.load(models[fold]))
         model.eval()
         model_list.append(model)
-    threshold = 0.5 if config['training']['log_jaccard'] is False else 0.3
+    threshold = 0.5 if config['training']['log_jaccard'] is False else 0.5
     print(f'Found {len(model_list)} models.')
 
     # Find image files
@@ -77,28 +86,35 @@ if __name__ == "__main__":
     except AttributeError:
         input_x = config['training']['crop_size'][0]
         input_y = config['training']['crop_size'][1]
-    for file in tqdm(files, desc='Running inference'):
 
-        img_full = cv2.imread(file)
-        #img_full = np.flip(img_full, axis=0)
+    for fold in range(len(models)):
+        # List validation images
+        validation_files = split_config[f'fold_{fold}']['val'].fname.values
 
-        x, y, ch = img_full.shape
-        mask_full = np.zeros((x, y))
+        for file in tqdm(validation_files, desc=f'Running inference for fold {fold}'):
 
-        # Cut large image into overlapping tiles
-        tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
-                            tile_step=(input_x // 2, input_y // 2), weight=args.weight)
+            if 'µCT' in args.dataset_root:
+                pth = str(args.dataset_root / str(file).rsplit('/', 2)[-2] / str(file).rsplit('/', 2)[-1])
+            else:
+                pth = str(args.dataset_root / file.name)
 
-        # HCW -> CHW. Optionally, do normalization here
-        tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
+            img_full = cv2.imread(pth)
+            # img_full = np.flip(img_full, axis=0)
 
-        # Allocate a CUDA buffer for holding entire mask
-        merger = CudaTileMerger(tiler.target_shape, channels=1, weight=tiler.weight)
+            x, y, ch = img_full.shape
+            mask_full = np.zeros((x, y))
 
-        # Loop evaluating inference on every fold
-        masks = []
-        for fold in range(len(models)):
+            # Cut large image into overlapping tiles
+            tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
+                                tile_step=(input_x // 2, input_y // 2), weight=args.weight)
 
+            # HCW -> CHW. Optionally, do normalization here
+            tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
+
+            # Allocate a CUDA buffer for holding entire mask
+            merger = CudaTileMerger(tiler.target_shape, channels=1, weight=tiler.weight)
+
+            # Loop evaluating inference on every fold
             # Run predictions for tiles and accumulate them
             for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops)), batch_size=args.bs, pin_memory=True):
                 # Move tile to GPU
@@ -121,40 +137,32 @@ if __name__ == "__main__":
             # Normalize accumulated mask and convert back to numpy
             merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
             merged_mask = tiler.crop_to_orignal_size(merged_mask)
-            # Plot
-            if args.plot:
-                for i in range(args.bs):
-                    if args.bs != 1:
-                        plt.imshow(merged_mask)
-                    else:
-                        plt.imshow(merged_mask.squeeze())
-                    plt.show()
-            masks.append(merged_mask)
 
-        # Average of predictions
-        mask_mean = np.mean(masks, 0)
-        mask_final = (mask_mean >= threshold).astype('uint8') * 255
+            mask_final = (merged_mask >= threshold).astype('uint8') * 255
 
-        # Save predicted full mask
-        cv2.imwrite(str(args.save_dir) + '/' + file.split('/')[-1][:-4] + '.bmp', mask_final)
+            # Save predicted full mask
+            cv2.imwrite(str(args.save_dir) + '/' + str(file.stem) + '.bmp', mask_final)
 
-        # Save largest mask
-        largest_mask = largest_object(mask_final)
-        cv2.imwrite(str(args.save_dir / 'Largest') + '/' + file.split('/')[-1][:-4] + '.bmp', largest_mask)
+            # Save largest mask
+            largest_mask = largest_object(mask_final)
+            cv2.imwrite(str(args.save_dir / 'Largest') + '/' + str(file.stem) + '.bmp', largest_mask)
 
-        # Save reference images
-        """
-        cv2.imwrite(str(args.save_dir) + '/' + file.split('/')[-1][:-4] + '_input.png', img_full)
-        m = largest_mask.squeeze()
-        fig = plt.figure(); ax = fig.add_subplot(111); ax.set_axis_off()
-        ax.imshow(cv2.cvtColor(img_full, cv2.COLOR_BGR2RGB)); ax.imshow(np.ma.masked_array(m, m == 0), cmap='summer', alpha=0.4)
-        fig.savefig(str(args.save_dir) + '/' + file.split('/')[-1][:-4] + '_reference.png', dpi=800,
-                    bbox_inches='tight', pad_inches=0)
-        """
-        # Free memory
-        torch.cuda.empty_cache()
-        gc.collect()
+            # Save reference images
 
+            cv2.imwrite(str(args.save_dir / 'visualization' / str(file).split('/')[-1][:-4]) + '_input.png', img_full)
+            m = largest_mask.squeeze()
+            fig = plt.figure()
+            plt.title(file)
+            ax = fig.add_subplot(111)
+            ax.set_axis_off()
+            ax.imshow(cv2.cvtColor(img_full, cv2.COLOR_BGR2RGB)); ax.imshow(np.ma.masked_array(m, m == 0), cmap='summer', alpha=0.4)
+            fig.savefig(str(args.save_dir / 'visualization' / str(file).split('/')[-1][:-4]) + '_reference.png',
+                        dpi=800, bbox_inches='tight', pad_inches=0)
+            plt.close(fig)
+
+            # Free memory
+            torch.cuda.empty_cache()
+            gc.collect()
 
     dur = time() - start
     print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

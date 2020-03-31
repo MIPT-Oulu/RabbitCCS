@@ -27,8 +27,8 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL')
-    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_CTRL_new')
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CL')
+    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_ALL_0.4')
     #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Matched histology (corrected)')
     #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Matched histology (corrected)/prediction')
     #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/SDG_DIC/Main')
@@ -36,7 +36,8 @@ if __name__ == "__main__":
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
-    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_10_07_12_04_00_new_trfs/')
+    #parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_10_07_12_04_00_new_trfs/')
+    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_11_19_15_45_01_hist_validation/')
     #parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_09_27_16_08_10_12samples/')
     args = parser.parse_args()
 
@@ -62,14 +63,15 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(models[fold]))
         model.eval()
         model_list.append(model)
-    threshold = 0.5 if config['training']['log_jaccard'] is False else 0.3
+    threshold = 0.5 if config['training']['log_jaccard'] is False else 0.5
     print(f'Found {len(model_list)} models.')
 
     # Find image files
-    files = glob(str(args.dataset_root) + '/*.png')
+    files = glob(str(args.dataset_root) + '/*.tif')
     files.sort()
     args.save_dir.mkdir(exist_ok=True)
     (args.save_dir / 'Largest').mkdir(exist_ok=True)
+    (args.save_dir / 'visualization').mkdir(exist_ok=True)
     # Loop for all images
     try:
         input_x = args_experiment.crop_size[0]
@@ -142,14 +144,15 @@ if __name__ == "__main__":
         largest_mask = largest_object(mask_final)
         cv2.imwrite(str(args.save_dir / 'Largest') + '/' + file.split('/')[-1][:-4] + '.bmp', largest_mask)
 
-        # Save reference images
+        # Save reference images (slows down the script)
         """
-        cv2.imwrite(str(args.save_dir) + '/' + file.split('/')[-1][:-4] + '_input.png', img_full)
+        cv2.imwrite(str(args.save_dir / 'visualization' / file.split('/')[-1][:-4]) + '_input.png', img_full)
         m = largest_mask.squeeze()
         fig = plt.figure(); ax = fig.add_subplot(111); ax.set_axis_off()
         ax.imshow(cv2.cvtColor(img_full, cv2.COLOR_BGR2RGB)); ax.imshow(np.ma.masked_array(m, m == 0), cmap='summer', alpha=0.4)
-        fig.savefig(str(args.save_dir) + '/' + file.split('/')[-1][:-4] + '_reference.png', dpi=800,
+        fig.savefig(str(args.save_dir / 'visualization' / file.split('/')[-1][:-4]) + '_reference.png', dpi=800,
                     bbox_inches='tight', pad_inches=0)
+        plt.close(fig)
         """
         # Free memory
         torch.cuda.empty_cache()
