@@ -34,7 +34,7 @@ def init_experiment(experiment='2D'):
     parser.add_argument('--workdir', type=pathlib.Path, default='../../../workdir/')
     parser.add_argument('--experiment', default='../experiments/experiment_config.yml')
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--model_unet', type=bool, default=True)
+    parser.add_argument('--model_unet', type=bool, default=False)
     parser.add_argument('--num_threads', type=int, default=16)
     parser.add_argument('--bs', type=int, default=5)
     parser.add_argument('--gpus', type=int, default=2)

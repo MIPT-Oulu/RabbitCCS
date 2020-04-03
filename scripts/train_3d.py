@@ -53,6 +53,8 @@ if __name__ == "__main__":
             model = nn.DataParallel(model).to(device)
         else:
             model = model.to(device)
+        backbone = config['model']['backbone']
+        print(f'Encoder: {backbone}')
 
         # Optimizer
         optimizer = optim.Adam(model.parameters(),

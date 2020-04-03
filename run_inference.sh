@@ -11,5 +11,5 @@ python scripts/experiment_runner.py --data_root ${ROOT}/Data \
 
 for SNP in $(ls ${ROOT}/workdir/snapshots | grep "2019_")
 do
-    python scripts/inference_tiles.py --workdir ${ROOT}/workdir --snapshot ${SNP}
+    python scripts/inference_tiles_oof_3d.py --workdir ${ROOT}/workdir --snapshot ${SNP}
 done

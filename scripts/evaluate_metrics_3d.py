@@ -22,54 +22,36 @@ cv2.setNumThreads(0)
 
 if __name__ == "__main__":
     start = time()
-    #pred_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Used in method manuscript for CC segmentation/')
-    pred_path = Path('../../../Data/µCT/')
-    #pred_path = Path('/media/dios/databank/Lingwei_Huang/Used in method manuscript for CC segmentation/')
-    #snapshot = Path('dios-erc-gpu_2019_09_18_15_32_33_8samples')
-    snapshot = Path('dios-erc-gpu_2019_09_27_16_08_10_12samples')
-    #subdir = 'Largest_4fold'
-    #subdir = 'Prediction_12samples'
-    #subdir = 'Automatic_CC_segmentation'
-    #subdir_mask = 'Manual_CC_mask_after_smoothing'
+    base_path = Path('../../../Data/µCT/')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mask_path', type=Path, default=pred_path / 'masks')
-    #parser.add_argument('--mask_path', type=Path, default=pred_path)
-    parser.add_argument('--image_path', type=Path, default=pred_path / 'images')
-    parser.add_argument('--prediction_path', type=Path, default=pred_path / 'predictions')
-    parser.add_argument('--save_dir', type=Path, default=pred_path / 'evaluation')
-    #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/images')
-    parser.add_argument('--eval_name', type=str, default='network')
+    parser.add_argument('--mask_path', type=Path, default=base_path / 'masks')
+    parser.add_argument('--image_path', type=Path, default=base_path / 'images')
+    parser.add_argument('--prediction_path', type=Path, default=base_path / 'predictions')
+    parser.add_argument('--save_dir', type=Path, default=base_path / 'evaluation')
     parser.add_argument('--n_threads', type=int, default=16)
     parser.add_argument('--n_labels', type=int, default=2)
-    parser.add_argument('--experiment', default='./experiment_config_uCT.yml')
-    parser.add_argument('--snapshot', type=Path,
-                        default=Path('../../../workdir/snapshots/') / snapshot)
-    parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
     args = parser.parse_args()
 
-    # Load snapshot configuration
-    with open(args.snapshot / 'config.yml', 'r') as f:
-        config = yaml.load(f, Loader=yaml.Loader)
+    # Snapshots to be evaluated
+    snaps = os.listdir(str(args.prediction_path))
+    snaps.sort()
 
-    with open(args.snapshot / 'args.dill', 'rb') as f:
-        args_experiment = dill.load(f)
-
-    with open(args.snapshot / 'split_config.dill', 'rb') as f:
-        split_config = dill.load(f)
-
-    # Initialize results
-    results = {'Sample': [], 'Dice': [], 'IoU': [], 'Similarity': []}
-
-    # Loop for samples
+    # Iterate through snapshots
     args.save_dir.mkdir(exist_ok=True)
-    (args.save_dir / 'visualizations').mkdir(exist_ok=True)
-    #samples = [os.path.basename(x) for x in glob(str(args.mask_path / '*XZ'))]
-    samples = os.listdir(str(args.mask_path))
-    samples.sort()
-    for idx, sample in enumerate(samples):
-        try:
-            sleep(0.5); print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
+    for snap in snaps:
+
+        # Initialize results
+        results = {'Sample': [], 'Dice': [], 'IoU': [], 'Similarity': []}
+
+        # Loop for samples
+        (args.save_dir / ('visualizations_' + snap)).mkdir(exist_ok=True)
+        samples = os.listdir(str(args.mask_path))
+        samples.sort()
+        for idx, sample in enumerate(samples):
+
+            sleep(0.5)
+            print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
 
             # Load image stacks
             if 'subdir_mask' in locals():
@@ -96,19 +78,14 @@ if __name__ == "__main__":
             print(f'Sample {sample}: dice = {dice}, IoU = {iou}, similarity = {sim}')
 
             # Save predicted full mask
-            """
-            render_volume(np.bitwise_xor(pred, mask),
-                          savepath=str(args.save_dir / 'visualizations' / (sample + '_difference.png')),
-                          white=False, use_outline=False)
-            """
-            print_orthogonal(data, invert=False, res=3.2, title=None, cbar=True,
-                             savepath=str(args.save_dir / 'visualizations' / (sample + '_input.png')),
+            print_orthogonal(data, invert=False, res=3.2, cbar=True,
+                             savepath=str(args.save_dir / ('visualizations_' + snap) / (sample + '_input.png')),
                              scale_factor=1500)
-            print_orthogonal(data, mask=mask, invert=False, res=3.2, title=None, cbar=True,
-                             savepath=str(args.save_dir / 'visualizations' / (sample + '_reference.png')),
+            print_orthogonal(data, mask=mask, invert=False, res=3.2, cbar=True,
+                             savepath=str(args.save_dir / ('visualizations_' + snap) / (sample + '_reference.png')),
                              scale_factor=1500)
-            print_orthogonal(data, mask=pred, invert=False, res=3.2, title=None, cbar=True,
-                             savepath=str(args.save_dir / 'visualizations' / (sample + '_prediction.png')),
+            print_orthogonal(data, mask=pred, invert=False, res=3.2, cbar=True,
+                             savepath=str(args.save_dir / ('visualizations_' + snap) / (sample + '_prediction.png')),
                              scale_factor=1500)
 
             # Update results
@@ -117,20 +94,16 @@ if __name__ == "__main__":
             results['IoU'].append(iou)
             results['Similarity'].append(sim)
 
-        except Exception as e:
-            print(f'Sample {sample} failing due to error:\n\n{e}\n!')
-            continue
+        # Add average value to
+        results['Sample'].append('Average values')
+        results['Dice'].append(np.average(results['Dice']))
+        results['IoU'].append(np.average(results['IoU']))
+        results['Similarity'].append(np.average(results['Similarity']))
 
-    # Add average value to
-    results['Sample'].append('Average values')
-    results['Dice'].append(np.average(results['Dice']))
-    results['IoU'].append(np.average(results['IoU']))
-    results['Similarity'].append(np.average(results['Similarity']))
+        # Write to excel
+        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap)) + '.xlsx'))
+        df1 = pd.DataFrame(results)
+        df1.to_excel(writer, sheet_name='Metrics')
+        writer.save()
 
-    # Write to excel
-    writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snapshot) + '_' + args.eval_name)) + '.xlsx')
-    df1 = pd.DataFrame(results)
-    df1.to_excel(writer, sheet_name='Metrics')
-    writer.save()
-
-    print(f'Metrics evaluated in {(time() - start) // 60} minutes, {(time() - start) % 60} seconds.')
+        print(f'Metrics evaluated in {(time() - start) // 60} minutes, {(time() - start) % 60} seconds.')

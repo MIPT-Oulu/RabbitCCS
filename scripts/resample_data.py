@@ -9,11 +9,11 @@ if __name__ == "__main__":
     # Initialize experiment
     args, config, device, snapshots_dir, snapshot_name = init_experiment()
     #base_path = args.data_location / 'µCT'
-    #base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Curated training data')
-    base_path = Path('/media/dios/dios2/RabbitSegmentation/Data_from_Lingwei/New manual CC segmentation of 4 knees')
+    base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Curated training data')
+    #base_path = Path('/media/dios/dios2/RabbitSegmentation/Data_from_Lingwei/New manual CC segmentation of 4 knees')
     #base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Full dataset')
     masks_loc = base_path / 'masks_full'
-    images_loc = base_path / 'images_segmented'
+    images_loc = base_path / 'CC_window_resampled'
     #images_loc = base_path / 'CC_window_OA'
     #images_loc = base_path / 'CC_window_rec'
     #images_loc = base_path / 'CC_window_OA_resampled'

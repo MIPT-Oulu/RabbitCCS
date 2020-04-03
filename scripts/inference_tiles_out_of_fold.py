@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
         for file in tqdm(validation_files, desc=f'Running inference for fold {fold}'):
 
-            if 'µCT' in args.dataset_root:
+            if 'µCT' in str(args.dataset_root):
                 pth = str(args.dataset_root / str(file).rsplit('/', 2)[-2] / str(file).rsplit('/', 2)[-1])
             else:
                 pth = str(args.dataset_root / file.name)

@@ -1,9 +1,6 @@
 import cv2
 import numpy as np
-import gc
 import os
-import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
 from pathlib import Path
 import argparse
 import dill
@@ -12,127 +9,19 @@ import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
 import yaml
-from time import sleep, time
-from skimage import measure
+from time import time
 from tqdm import tqdm
 from glob import glob
 from collagen.modelzoo.segmentation import EncoderDecoder
 from collagen.core.utils import auto_detect_device
 
 from rabbitccs.data.utilities import load, save, print_orthogonal
+from rabbitccs.inference.model_components import InferenceModel
+from rabbitccs.inference.pipeline_components import inference, largest_object
 from rabbitccs.data.visualizations import render_volume
-
-from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
-from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
-
-
-class InferenceModel(nn.Module):
-    def __init__(self, models_list):
-        super(InferenceModel, self).__init__()
-        self.n_folds = len(models_list)
-        modules = {}
-        for idx, m in enumerate(models_list):
-            modules[f'fold_{idx}'] = m
-
-        self.__dict__['_modules'] = modules
-
-    def forward(self, x):
-        res = 0
-        for idx in range(self.n_folds):
-            fold = self.__dict__['_modules'][f'fold_{idx}']
-            #res += torch2trt(fold, [x]).sigmoid()
-            res += fold(x).sigmoid()
-
-        return res / self.n_folds
-
-
-def inference(inference_model, img_full, device='cuda', mean=None, std=None):
-    x, y, ch = img_full.shape
-
-    input_x = config['training']['crop_size'][0]
-    input_y = config['training']['crop_size'][1]
-
-    # Cut large image into overlapping tiles
-    tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
-                        tile_step=(input_x // 2, input_y // 2), weight=args.weight)
-
-    # HCW -> CHW. Optionally, do normalization here
-    tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
-
-    # Allocate a CUDA buffer for holding entire mask
-    merger = CudaTileMerger(tiler.target_shape, channels=1, weight=tiler.weight)
-
-    # Run predictions for tiles and accumulate them
-    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops)), batch_size=args.bs, pin_memory=True):
-        # Move tile to GPU
-        if mean is not None and std is not None:
-            tiles_batch = tiles_batch.float()
-            for ch in range(len(mean)):
-                tiles_batch[:, ch, :, :] = ((tiles_batch[:, ch, :, :] - mean[ch]) / std[ch])
-            tiles_batch = tiles_batch.to(device)
-        else:
-            tiles_batch = (tiles_batch.float() / 255.).to(device)
-        # Predict and move back to CPU
-        pred_batch = inference_model(tiles_batch)
-
-        # Merge on GPU
-        merger.integrate_batch(pred_batch, coords_batch)
-
-        # Plot
-        if args.plot:
-            for i in range(args.bs):
-                if args.bs != 1:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze()[i, :, :])
-                else:
-                    plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze())
-                plt.show()
-
-    # Normalize accumulated mask and convert back to numpy
-    merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
-    merged_mask = tiler.crop_to_orignal_size(merged_mask)
-    # Plot
-    if args.plot:
-        for i in range(args.bs):
-            if args.bs != 1:
-                plt.imshow(merged_mask)
-            else:
-                plt.imshow(merged_mask.squeeze())
-            plt.show()
-
-    torch.cuda.empty_cache()
-    gc.collect()
-
-    return merged_mask.squeeze()
-
-
-def largest_object(input_mask):
-    """
-    Keeps only the largest connected component of a binary segmentation mask.
-    """
-
-    output_mask = np.zeros(input_mask.shape, dtype=np.uint8)
-
-    # Label connected components
-    binary_img = input_mask.astype(np.bool)
-    blobs = measure.label(binary_img, connectivity=1)
-
-    # Measure area
-    proportions = measure.regionprops(blobs)
-
-    if not proportions:
-        print('No mask detected! Returning original mask')
-        return input_mask
-
-    area = [ele.area for ele in proportions]
-    largest_blob_ind = np.argmax(area)
-    largest_blob_label = proportions[largest_blob_ind].label
-
-    output_mask[blobs == largest_blob_label] = 255
-
-    return output_mask
 
 
 if __name__ == "__main__":
@@ -158,7 +47,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     subdir = 'NN_prediction'  # 'NN_prediction'
     threshold = 0.8
-
 
     # Load snapshot configuration
     with open(args.snapshot / 'config.yml', 'r') as f:
@@ -230,11 +118,11 @@ if __name__ == "__main__":
             # 1st orientation
             with torch.no_grad():  # Do not update gradients
                 for slice_idx in tqdm(range(data_yz.shape[2]), desc='Running inference, YZ'):
-                    mask_yz[:, :, slice_idx] = inference(model, data_yz[:, :, slice_idx, :])
+                    mask_yz[:, :, slice_idx] = inference(model, args, config, data_yz[:, :, slice_idx, :])
                 # 2nd orientation
                 if args.avg_planes:
                     for slice_idx in tqdm(range(data_xz.shape[2]), desc='Running inference, XZ'):
-                        mask_xz[:, :, slice_idx] = inference(model, data_xz[:, :, slice_idx, :])
+                        mask_xz[:, :, slice_idx] = inference(model, args, config, data_xz[:, :, slice_idx, :])
 
             # Average probability maps
             if args.avg_planes:
