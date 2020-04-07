@@ -1,6 +1,7 @@
 import numpy as np
 from torch import optim, cuda, nn
 from time import time
+from copy import deepcopy
 import gc
 import cv2
 import segmentation_models_pytorch as smp
@@ -24,23 +25,29 @@ if __name__ == "__main__":
     start = time()
 
     # Initialize experiment
-    args_list, config_list, device = init_experiment()
+    args_base, config_list, device = init_experiment()
 
-    for experiment in range(len(args_list)):
+    for experiment in range(len(config_list)):
         # Current experiment
-        args = args_list[experiment]
+        args = deepcopy(args_base)
         config = config_list[experiment]
+
+        # Update arguments according to the configuration file
+        if config['training']['experiment'] == '3D':
+            args.data_location = args.data_location / 'µCT'
+        elif config['training']['experiment'] == '2D_large':
+            args.data_location = args.data_location / 'human'
 
         # Loss
         loss_criterion = init_loss(config, device=device)
 
         # Split training folds
         splits_metadata = build_splits(args.data_location, args, config, parse_grayscale,
-                                       args.snapshots_dir, args.snapshot_name)
+                                       args.snapshots_dir, config['training']['snapshot'])
         mean, std = splits_metadata['mean'], splits_metadata['std']
 
         # Save transforms list
-        save_transforms(args.snapshots_dir / args.snapshot_name, config, args, mean, std)
+        save_transforms(args.snapshots_dir / config['training']['snapshot'], config, args, mean, std)
 
         # Training for separate folds
         for fold in range(config['training']['n_folds']):
@@ -49,18 +56,17 @@ if __name__ == "__main__":
             data_provider = create_data_provider(args, config, parse_grayscale, metadata=splits_metadata[f'fold_{fold}'],
                                                  mean=mean, std=std)
             # Initialize model model
-            if args.model_unet:
-                model = smp.Unet(config['model']['backbone'], encoder_weights="imagenet", activation='sigmoid')
-                print('UNet selected')
+            backbone = config['model']['backbone']
+            decoder = config['model']['decoder']
+            if decoder.lower() == 'unet':
+                model = smp.Unet(backbone, encoder_weights="imagenet", activation='sigmoid')
             else:
                 model = EncoderDecoder(**config['model'])
-                print('EncoderDecoder selected')
             if args.gpus > 1:
                 model = nn.DataParallel(model).to(device)
             else:
                 model = model.to(device)
-            backbone = config['model']['backbone']
-            decoder = config['model']['decoder']
+
             print(f'Encoder: {backbone}, decoder: {decoder}')
 
             # Optimizer
@@ -68,8 +74,8 @@ if __name__ == "__main__":
                                    lr=config['training']['lr'],
                                    weight_decay=config['training']['wd'])
             # Callbacks
-            train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir, args.snapshot_name, model, optimizer,
-                                                data_provider, mean, std)
+            train_cbs, val_cbs = init_callbacks(fold, config, args.snapshots_dir, config['training']['snapshot'], model,
+                                                optimizer, data_provider, mean, std)
             # Run training
             strategy = Strategy(data_provider=data_provider,
                                 train_loader_names=tuple(config['data_sampling']['train']['data_provider'].keys()),
@@ -77,7 +83,7 @@ if __name__ == "__main__":
                                 data_sampling_config=config['data_sampling'],
                                 loss=loss_criterion,
                                 model=model,
-                                n_epochs=args.n_epochs,
+                                n_epochs=config['training']['epochs'],
                                 optimizer=optimizer,
                                 train_callbacks=train_cbs,
                                 val_callbacks=val_cbs,

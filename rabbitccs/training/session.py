@@ -46,34 +46,27 @@ def init_experiment():
 
     # Open configuration files and add to list
     config_list = []
-    args_list = []
     for config_path in config_paths:
         if config_path[-4:] == '.yml':
-            with open(config_path, 'r') as f:
+            with open(args.experiment / config_path, 'r') as f:
                 config = yaml.load(f, Loader=yaml.FullLoader)
-                config_list.extend(config)
-            args_list.extend(args)
+                config_list.append(config)
 
-        # Update arguments according to the configuration file
-        if config['training']['experiment'] == '3D':
-            # µCT parameters
-            args_list[-1].data_location = args.data_location / 'µCT'
-        elif config['training']['experiment'] == '2D_large':
-            args_list[-1].data_location = args.data_location / 'human'
+
 
         # Snapshot directory
         encoder = config['model']['backbone']
         decoder = config['model']['decoder']
         snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{encoder}_{decoder}')
-        (args_list[-1].snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
-        args_list[-1].snapshot_name = snapshot_name
+        (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
+        config['training']['snapshot'] = snapshot_name
 
         # Save the experiment parameters
-        with open(args_list[-1].snapshots_dir / snapshot_name / 'config.yml', 'w') as f:
+        with open(args.snapshots_dir / snapshot_name / 'config.yml', 'w') as f:
             yaml.dump(config, f, Dumper=yaml.Dumper, default_flow_style=False)
         # Save args
-        with open(args_list[-1].snapshots_dir / snapshot_name / 'args.dill', 'wb') as f:
-            dill.dump(args_list[-1], f)
+        with open(args.snapshots_dir / snapshot_name / 'args.dill', 'wb') as f:
+            dill.dump(args, f)
 
     # Seeding
     torch.manual_seed(args.seed)
@@ -83,7 +76,7 @@ def init_experiment():
     # Calculation resource
     device = auto_detect_device()
 
-    return args_list, config_list, device
+    return args, config_list, device
 
 
 def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, data_provider, mean, std):
@@ -149,7 +142,7 @@ def create_data_provider(args, config, parser, metadata, mean, std):
                                                    transform=train_test_transforms(config, mean, std,
                                                    crop_size=tuple(config['training']['crop_size']))[stage],
                                                    parse_item_cb=parser,
-                                                   batch_size=args.bs, num_workers=args.num_threads,
+                                                   batch_size=config['training']['bs'], num_workers=args.num_threads,
                                                    shuffle=True if stage == "train" else False)
 
     return DataProvider(item_loaders)

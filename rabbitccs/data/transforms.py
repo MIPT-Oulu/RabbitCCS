@@ -81,7 +81,7 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
     trf = conf['training']
     prob = trf['transform_probability']
     # Training transforms
-    if trf['uCT']:
+    if trf['experiment'] == '3D':
         train_transforms = [
             slt.RandomProjection(
                 slc.Stream([

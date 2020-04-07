@@ -327,7 +327,7 @@ if __name__ == '__main__':
         args.th_maps.mkdir(exist_ok=True)
         (args.th_maps / 'visualization').mkdir(exist_ok=True)
         for sample in samples:
-            pred, files = load(str(args.masks / sample), axis=(2, 0, 1,))
+            pred, files = load(str(args.masks / sample), axis=(1, 2, 0,))
             print_orthogonal(pred)
             save(str(args.th_maps / sample), sample, pred)
             th_map = _local_thickness(pred, spacing_mm=args.resolution, stack_axis=0)

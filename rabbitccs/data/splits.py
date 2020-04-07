@@ -60,7 +60,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
         mean, std = tmp['mean'], tmp['std']
     else:  # Calculate
         print('==> Estimating mean and std')
-        mean, std = estimate_mean_std(config, metadata, parser, args.num_threads, args.bs)
+        mean, std = estimate_mean_std(config, metadata, parser, args.num_threads, config['training']['bs'])
         torch.save({'mean': mean, 'std': std}, mean_std_path)
 
     print('==> Mean:', mean)
