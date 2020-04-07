@@ -9,7 +9,7 @@ import torch.nn as nn
 import dill
 import json
 import cv2
-import matplotlib.pyplot as plt
+import os
 import solt.data as sld
 from tensorboardX import SummaryWriter
 # from torch.utils.tensorboard import SummaryWriter
@@ -23,59 +23,67 @@ from collagen.callbacks.logging import ScalarMeterLogger
 from collagen.callbacks import ModelSaver, ImageMaskVisualizer, SimpleLRScheduler
 from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 
-from rabbitccs.data.splits import build_splits
-from rabbitccs.data.transforms import train_test_transforms, estimate_mean_std
+from rabbitccs.data.transforms import train_test_transforms
 
 
-def init_experiment(experiment='2D'):
+def init_experiment():
     # Input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_location', type=pathlib.Path, default='../../../Data')
     parser.add_argument('--workdir', type=pathlib.Path, default='../../../workdir/')
-    parser.add_argument('--experiment', default='../experiments/experiment_config.yml')
+    parser.add_argument('--experiment', type=pathlib.Path, default='../experiments/run')
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--model_unet', type=bool, default=False)
     parser.add_argument('--num_threads', type=int, default=16)
-    parser.add_argument('--bs', type=int, default=5)
     parser.add_argument('--gpus', type=int, default=2)
-    parser.add_argument('--n_epochs', type=int, default=100)
     args = parser.parse_args()
 
-    if experiment == '3D':
-        # µCT parameters
-        args.data_location = args.data_location / 'µCT'
-        args.experiment = '../experiments/experiment_config_uCT.yml'
-        args.bs = 12
-        args.n_epochs = 60
-        #args.n_epochs = 50
-        #args.model_unet = True
-    elif experiment == '2D_large':
-        args.data_location = args.data_location / 'human'
+    # Initialize working directories
+    args.snapshots_dir = args.workdir / 'snapshots'
+    args.snapshots_dir.mkdir(exist_ok=True)
 
-    # Open configuration file
-    with open(args.experiment, 'r') as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
+    # List configuration files
+    config_paths = os.listdir(str(args.experiment))
+
+    # Open configuration files and add to list
+    config_list = []
+    args_list = []
+    for config_path in config_paths:
+        if config_path[-4:] == '.yml':
+            with open(config_path, 'r') as f:
+                config = yaml.load(f, Loader=yaml.FullLoader)
+                config_list.extend(config)
+            args_list.extend(args)
+
+        # Update arguments according to the configuration file
+        if config['training']['experiment'] == '3D':
+            # µCT parameters
+            args_list[-1].data_location = args.data_location / 'µCT'
+        elif config['training']['experiment'] == '2D_large':
+            args_list[-1].data_location = args.data_location / 'human'
+
+        # Snapshot directory
+        encoder = config['model']['backbone']
+        decoder = config['model']['decoder']
+        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{encoder}_{decoder}')
+        (args_list[-1].snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
+        args_list[-1].snapshot_name = snapshot_name
+
+        # Save the experiment parameters
+        with open(args_list[-1].snapshots_dir / snapshot_name / 'config.yml', 'w') as f:
+            yaml.dump(config, f, Dumper=yaml.Dumper, default_flow_style=False)
+        # Save args
+        with open(args_list[-1].snapshots_dir / snapshot_name / 'args.dill', 'wb') as f:
+            dill.dump(args_list[-1], f)
 
     # Seeding
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    # Initialize working directories
-    snapshots_dir = pathlib.Path(args.workdir) / 'snapshots'
-    snapshots_dir.mkdir(exist_ok=True)
+    # Calculation resource
     device = auto_detect_device()
-    snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S')
-    (snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
 
-    # Save the experiment parameters
-    with open(snapshots_dir / snapshot_name / 'config.yml', 'w') as f:
-        yaml.dump(config, f, Dumper=yaml.Dumper, default_flow_style=False)
-    # args
-    with open(snapshots_dir / snapshot_name / 'args.dill', 'wb') as f:
-        dill.dump(args, f)
-
-    return args, config, device, snapshots_dir, snapshot_name
+    return args_list, config_list, device
 
 
 def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, data_provider, mean, std):
