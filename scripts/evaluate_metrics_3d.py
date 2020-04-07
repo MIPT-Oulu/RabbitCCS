@@ -36,6 +36,7 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     snaps = os.listdir(str(args.prediction_path))
     snaps.sort()
+    snaps = [snaps[-1]]
 
     # Iterate through snapshots
     args.save_dir.mkdir(exist_ok=True)
@@ -59,9 +60,9 @@ if __name__ == "__main__":
             else:
                 mask, files_mask = load(str(args.mask_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
             if 'subdir' in locals():
-                pred, files_pred = load(str(args.prediction_path / sample / subdir), rgb=False, n_jobs=args.n_threads)
+                pred, files_pred = load(str(args.prediction_path / snap / sample / subdir), rgb=False, n_jobs=args.n_threads)
             else:
-                pred, files_pred = load(str(args.prediction_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
+                pred, files_pred = load(str(args.prediction_path / snap / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
             data, files_data = load(str(args.image_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
 
             # Crop in case of inconsistency
@@ -101,7 +102,7 @@ if __name__ == "__main__":
         results['Similarity'].append(np.average(results['Similarity']))
 
         # Write to excel
-        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap)) + '.xlsx'))
+        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap))) + '.xlsx')
         df1 = pd.DataFrame(results)
         df1.to_excel(writer, sheet_name='Metrics')
         writer.save()

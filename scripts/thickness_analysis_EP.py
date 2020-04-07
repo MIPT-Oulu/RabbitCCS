@@ -310,11 +310,12 @@ def local_thickness(input_, num_classes, stack_axis, spacing_mm=(1, 1, 1),
 if __name__ == '__main__':
     # ******************************** 3D case ************************************
     start = time()
-
+    # base_path = Path('../../../Data/µCT')
+    base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Full dataset')
     parser = argparse.ArgumentParser()
-    parser.add_argument('--images', type=Path, default='../../../Data/µCT/images')
-    parser.add_argument('--masks', type=Path, default='../../../Data/µCT/predictions_outoffold')
-    parser.add_argument('--th_maps', type=Path, default='../../../Data/µCT/thickness')
+    parser.add_argument('--images', type=Path, default=base_path / 'CC_window_rec')
+    parser.add_argument('--masks', type=Path, default=base_path / 'Predictions_FPN_Resnet18')
+    parser.add_argument('--th_maps', type=Path, default=base_path / 'thickness_CTRL')
     parser.add_argument('--plot', type=bool, default=True)
     parser.add_argument('--resolution', type=tuple, default=(3.2, 3.2, 3.2))  # in µm
     parser.add_argument('--uCT', type=bool, default=True)
@@ -326,13 +327,15 @@ if __name__ == '__main__':
         args.th_maps.mkdir(exist_ok=True)
         (args.th_maps / 'visualization').mkdir(exist_ok=True)
         for sample in samples:
-            pred, files = load(str(args.masks / sample))
-
-            th_map = _local_thickness(pred, spacing_mm=args.resolution)
+            pred, files = load(str(args.masks / sample), axis=(2, 0, 1,))
+            print_orthogonal(pred)
+            save(str(args.th_maps / sample), sample, pred)
+            th_map = _local_thickness(pred, spacing_mm=args.resolution, stack_axis=0)
 
             if args.plot:
+                print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_pred.png')))
                 print_orthogonal(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map.png')))
-                render_volume(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map_render.png')))
+                #render_volume(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map_render.png')))
 
             save(str(args.th_maps / sample), sample, th_map)
 
@@ -356,3 +359,6 @@ if __name__ == '__main__':
                        Path('/home/egor/Workspace/_experim/thickness', fname),
                        spacings=spacings,
                        rcp_to_ras=True)
+
+    dur = time() - start
+    print(f'Analysis completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

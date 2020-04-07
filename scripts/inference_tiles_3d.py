@@ -28,24 +28,24 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Should_be_resegmented_with_neural_network')
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Full dataset/CC_window_OA')
     #parser.add_argument('--dataset_root', type=Path, default='/media/santeri/Transcend1/Full samples/')
-    #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Should_be_resegmented_with_neural_network')
+    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Full dataset/Predictions_FPN_Resnet18_OA')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
-    parser.add_argument('--dataset_root', type=Path, default='../../../Data/µCT/images')
-    parser.add_argument('--save_dir', type=Path, default='../../../Data/µCT/predictions')
+    #parser.add_argument('--dataset_root', type=Path, default='../../../Data/µCT/images')
+    #parser.add_argument('--save_dir', type=Path, default='../../../Data/µCT/predictions')
     #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/predictions_databank_12samples/')
     parser.add_argument('--bs', type=int, default=12)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--completed', type=int, default=0)
-    parser.add_argument('--avg_planes', type=bool, default=False)
+    parser.add_argument('--avg_planes', type=bool, default=True)
     parser.add_argument('--snapshot', type=Path,
                         # default='../../../workdir/snapshots/dios-erc-gpu_2020_02_17_14_08_35_no_XY/')
-                        default='../../../workdir/snapshots/dios-erc-gpu_2020_03_19_19_53_42_resampled_corr')
+                        default='../../../workdir/snapshots/dios-erc-gpu_2020_04_03_07_25_01_FPN_resnet18')
     parser.add_argument('--dtype', type=str, choices=['.bmp', '.png', '.tif'], default='.bmp')
     args = parser.parse_args()
-    subdir = 'NN_prediction'  # 'NN_prediction'
+    #subdir = 'NN_prediction'  # 'NN_prediction'
     threshold = 0.8
 
     # Load snapshot configuration
