@@ -7,8 +7,8 @@ training:
   # Training
   wd: 0.0001
   lr: 0.0001
-  n_folds: 5
-  epochs: 100
+  n_folds: 4
+  epochs: 5
   bs: 12
   # Loss parameters: possible losses are "bce", "jaccard" and "combined"
   loss: combined
@@ -32,11 +32,14 @@ training:
   patience: 5
   factor: 0.1
   eps: 1e-7
+inference:
+  calc_inference: True
+  threshold: [0.8, 0.5]
 model:
   decoder_normalization: IN
   n_outputs: 1
   spatial_dropout: 0.1
-  backbone: resnet34
+  backbone: resnet18
   decoder: FPN
 data_sampling:
   train:

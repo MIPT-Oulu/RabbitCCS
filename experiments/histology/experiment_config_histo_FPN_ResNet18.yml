@@ -32,6 +32,9 @@ training:
   patience: 5
   factor: 0.1
   eps: 1e-7
+inference:
+  calc_inference: True
+  threshold: 0.8
 model:
   decoder_normalization: IN
   n_outputs: 1

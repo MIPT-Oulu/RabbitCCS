@@ -28,8 +28,8 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='../../../Data/µCT/images')
-    parser.add_argument('--save_dir', type=Path, default='../../../Data/µCT/predictions')
+    parser.add_argument('--dataset_root', type=Path, default='../../../Data/images')
+    parser.add_argument('--save_dir', type=Path, default='../../../Data/predictions')
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--gpus', type=int, default=2)
@@ -40,10 +40,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Snapshots to be evaluated
+    # µCT models
+    """
     snaps = ['dios-erc-gpu_2020_04_02_08_42_39_Unet_resnet18',
               'dios-erc-gpu_2020_04_02_11_18_28_Unet_resnet34',
               'dios-erc-gpu_2020_04_02_14_24_27_FPN_resnet34',
               'dios-erc-gpu_2020_04_03_07_25_01_FPN_resnet18']
+    """
+    snaps = ['dios-erc-gpu_2020_04_07_15_41_37_2D_resnet18_FPN',
+             'dios-erc-gpu_2020_04_07_15_41_37_2D_resnet34_FPN',
+             'dios-erc-gpu_2020_04_07_15_41_37_2D_resnet18_UNet',
+             'dios-erc-gpu_2020_04_07_15_41_37_2D_resnet34_UNet']
     snaps = [args.snapshots / snap for snap in snaps]
 
     # Iterate through snapshots
@@ -65,7 +72,11 @@ if __name__ == "__main__":
         device = auto_detect_device()
 
         # Load models
-        model_list = load_models(str(snap), config, unet=args_experiment.model_unet, n_gpus=args_experiment.gpus)
+        try:
+            unet = config['model']['decoder'].lower() == 'unet'
+            model_list = load_models(str(snap), config, unet=unet, n_gpus=args_experiment.gpus)
+        except KeyError:
+            model_list = load_models(str(snap), config, unet=args_experiment.model_unet, n_gpus=args_experiment.gpus)
         model = InferenceModel(model_list).to(device)
         model.eval()
         print(f'Found {len(model_list)} models.')
@@ -92,15 +103,20 @@ if __name__ == "__main__":
                 # img_full = np.flip(img_full, axis=0)
 
                 with torch.no_grad():  # Do not update gradients
-                    merged_mask = inference(model, args, config, img_full)
+                    merged_mask = inference(model, args, config, img_full, weight=args.weight)
 
                 mask_final = (merged_mask >= threshold).astype('uint8') * 255
 
                 # Save largest mask
                 largest_mask = largest_object(mask_final)
-                # When saving 3D stacks, file structure should be preserved
-                (save_dir / file.parent.stem).mkdir(exist_ok=True)
-                cv2.imwrite(str(save_dir / file.parent.stem / file.stem) + '.bmp', largest_mask)
+
+                if config['training']['experiment'] == '3D':
+                    # When saving 3D stacks, file structure should be preserved
+                    (save_dir / file.parent.stem).mkdir(exist_ok=True)
+                    cv2.imwrite(str(save_dir / file.parent.stem / file.stem) + '.bmp', largest_mask)
+                else:
+                    # Otherwise, save images directly
+                    cv2.imwrite(str(save_dir / file.stem) + '.bmp', largest_mask)
 
                 # Free memory
                 torch.cuda.empty_cache()

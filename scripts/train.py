@@ -15,6 +15,7 @@ from rabbitccs.training.session import create_data_provider, init_experiment, in
     init_loss, parse_grayscale, parse_color_im
 
 from rabbitccs.data.splits import build_splits
+from rabbitccs.inference.pipeline_components import inference_runner_oof
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -29,6 +30,7 @@ if __name__ == "__main__":
 
     for experiment in range(len(config_list)):
         # Current experiment
+        start_exp = time()
         args = deepcopy(args_base)
         config = config_list[experiment]
 
@@ -96,8 +98,11 @@ if __name__ == "__main__":
             cuda.empty_cache()
             gc.collect()
 
-        dur = time() - start
+        dur = time() - start_exp
         print(f'Model {experiment + 1} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
+
+        if config['inference']['calc_inference']:
+            inference_runner_oof(args, config, splits_metadata, device)
 
     dur = time() - start
     print(f'Models trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

@@ -43,6 +43,7 @@ def init_experiment():
 
     # List configuration files
     config_paths = os.listdir(str(args.experiment))
+    config_paths.sort()
 
     # Open configuration files and add to list
     config_list = []
@@ -52,12 +53,11 @@ def init_experiment():
                 config = yaml.load(f, Loader=yaml.FullLoader)
                 config_list.append(config)
 
-
-
         # Snapshot directory
         encoder = config['model']['backbone']
         decoder = config['model']['decoder']
-        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{encoder}_{decoder}')
+        experiment = config['training']['experiment']
+        snapshot_name = time.strftime(f'{socket.gethostname()}_%Y_%m_%d_%H_%M_%S_{experiment}_{encoder}_{decoder}')
         (args.snapshots_dir / snapshot_name).mkdir(exist_ok=True, parents=True)
         config['training']['snapshot'] = snapshot_name
 

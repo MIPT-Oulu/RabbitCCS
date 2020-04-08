@@ -28,9 +28,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL_crop_manual')
-    parser.add_argument('--dataset_root', type=Path, default='../../../Data/µCT/images')
+    parser.add_argument('--dataset_root', type=Path, default='../../../Data/images')
     #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_CTRL_crop_outoffold_0.5')
-    parser.add_argument('--save_dir', type=Path, default='../../../Data/µCT/predictions_outoffold')
+    parser.add_argument('--save_dir', type=Path, default='../../../Data/predictions')
     #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Matched histology (corrected)')
     #parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Matched histology (corrected)/prediction')
     #parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/SDG_DIC/Main')
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # Histology snapshot
     #parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2019_11_19_15_45_01_hist_validation/')
     # µCT snapshot
-    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_02_07_10_42_31_14samples/')
+    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_04_07_15_41_37_2D_resnet18_FPN/')
     args = parser.parse_args()
 
     # Load snapshot configuration
