@@ -1,310 +1,23 @@
 import os
+import h5py
+import matplotlib.pyplot as plt
 from pathlib import Path
-from time import time
+from time import time, strftime
+import pandas as pd
 
 import numpy as np
 import scipy.ndimage as ndi
 from skimage import morphology
 from numba import jit, prange
+from tqdm import tqdm
 #import nibabel as nib
 import torch
 import argparse
 
 from rabbitccs.data.utilities import load, save, print_orthogonal
+from rabbitccs.inference.thickness_analysis import _local_thickness
 from rabbitccs.data.visualizations import render_volume
 #from kneelite.various import numpy_to_nifti
-
-
-@jit(nopython=True)
-def _local_thick_2d(mask, med_axis, distance, search_extent):
-    out = np.zeros_like(mask, dtype=np.float32)
-
-    nonzero_x = np.nonzero(mask)
-    ii = nonzero_x[0]
-    jj = nonzero_x[1]
-
-    nonzero_med_axis = np.nonzero(med_axis)
-    mm = nonzero_med_axis[0]
-    nn = nonzero_med_axis[1]
-
-    for e in range(len(ii)):
-        i = ii[e]
-        j = jj[e]
-
-        best_val = 0
-
-        if search_extent is not None:
-            r0 = max(i - search_extent[0], 0)
-            r1 = min(i + search_extent[0], mask.shape[0] - 1)
-            c0 = max(j - search_extent[1], 0)
-            c1 = min(j + search_extent[1], mask.shape[1] - 1)
-
-        for w in range(len(mm)):
-            m = mm[w]
-            n = nn[w]
-
-            if search_extent is not None:
-                if m < r0 or m > r1 or n < c0 or n > c1:
-                    continue
-
-            if ((i - m) ** 2 + (j - n) ** 2) < (distance[m, n] ** 2):
-                if distance[m, n] > best_val:
-                    best_val = distance[m, n]
-
-        out[i, j] = best_val
-    return out
-
-
-@jit(nopython=True, parallel=True)
-def _local_thick_3d(mask, med_axis, distance, search_extent):
-    out = np.zeros_like(mask, dtype=np.float32)
-
-    nonzero_mask = np.nonzero(mask)
-    ii = nonzero_mask[0]
-    jj = nonzero_mask[1]
-    kk = nonzero_mask[2]
-    num_pts_mask = len(ii)
-
-    nonzero_med_axis = np.nonzero(med_axis)
-    mm = nonzero_med_axis[0]
-    nn = nonzero_med_axis[1]
-    oo = nonzero_med_axis[2]
-    num_pts_med_axis = len(mm)
-
-    best_vals = np.zeros((num_pts_mask, ))
-
-    for e in prange(num_pts_mask):
-        i = ii[e]
-        j = jj[e]
-        k = kk[e]
-
-        if search_extent is not None:
-            r0 = max(i - search_extent[0], 0)
-            r1 = min(i + search_extent[0], mask.shape[0] - 1)
-            c0 = max(j - search_extent[1], 0)
-            c1 = min(j + search_extent[1], mask.shape[1] - 1)
-            p0 = max(k - search_extent[2], 0)
-            p1 = min(k + search_extent[2], mask.shape[2] - 1)
-
-        for w in range(num_pts_med_axis):
-            m = mm[w]
-            n = nn[w]
-            o = oo[w]
-
-            if search_extent is not None:
-                if m < r0 or m > r1 or n < c0 or n > c1 or o < p0 or o > p1:
-                    continue
-
-            if ((i - m) ** 2 + (j - n) ** 2 + (k - o) ** 2) <= (distance[m, n, o] ** 2):
-                if distance[m, n, o] > best_vals[e]:
-                    best_vals[e] = distance[m, n, o]
-
-        out[i, j, k] = best_vals[e]
-    return out
-
-
-def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
-                     spacing_mm=None, stack_axis=None,
-                     thickness_max_mm=None,
-                     return_med_axis=False, return_distance=False):
-    """
-    Inspired by https://imagej.net/Local_Thickness .
-    Args:
-        mask: (D0, D1[, D2]) ndarray
-        mode: One of {'straight_skel_3d', 'stacked_2d',
-               'med2d_dist2d_lth3d', 'med2d_dist3d_lth3d'} or None
-            Implementation mode for 3D ``mask``. Ignored for 2D.
-        spacing_mm: tuple of ``mask.ndim`` elements
-            Size of ``mask`` voxels in mm.
-        stack_axis: None or int
-            Index of axis to perform slice selection along. Ignored for 2D.
-        thickness_max: None or int
-            Hypothesised maximum thickness in absolute values.
-            Used to constrain local ROIs to speed up best candidate search.
-        return_med_axis: bool
-            Whether to return the medial axis.
-        return_distance: bool
-            Whether to return the distance transform.
-    Returns:
-        out: ndarray
-            Local thickness.
-        med_axis: ndarray
-            Medial axis. Returned only if ``return_med_axis`` is True.
-        distance: ndarray
-            Distance transform. Returned only if ``return_distance`` is True.
-    """
-    # 1. Compute the distance transform
-    # 2. Find the distance ridge (/ exclude the redundant points)
-    # 3. Compute local thickness
-    if spacing_mm is None:
-        spacing_mm = (1,) * mask.ndim
-
-    if thickness_max_mm is None:
-        search_extent = None
-    else:
-        # Distance to the closest surface point is half of the thickness
-        distance_max_mm = thickness_max_mm / 2.
-        search_extent = np.ceil(distance_max_mm / np.asarray(spacing_mm)).astype(np.uint)
-
-    if mask.ndim == 2:
-        med_axis = morphology.medial_axis(mask)
-        distance = ndi.distance_transform_edt(mask, sampling=spacing_mm)
-        out = _local_thick_2d(mask=mask, med_axis=med_axis, distance=distance,
-                              search_extent=search_extent)
-
-    elif mask.ndim == 3:
-        if mode == 'straight_skel_3d':
-            from warnings import warn
-            msg = 'Straight skeleton is not suitable for local thickness'
-            warn(msg)
-            if thickness_max_mm is not None:
-                msg = f'`thickness_max_mm` is not supported in mode {mode}'
-                raise NotImplementedError()
-            skeleton = morphology.skeletonize_3d(mask)
-            distance = ndi.distance_transform_edt(mask, sampling=spacing_mm)
-            out = _local_thick_3d(mask=mask, med_axis=skeleton, distance=distance)
-            med_axis = skeleton
-
-        elif mode == 'stacked_2d':
-            if thickness_max_mm is not None:
-                msg = f'`thickness_max_mm` is not supported in mode {mode}'
-                raise NotImplementedError()
-
-            acc_med = []
-            acc_dist = []
-            acc_out = []
-
-            for idx_slice in range(mask.shape[stack_axis]):
-                sel_idcs = [slice(None), ] * mask.ndim
-                sel_idcs[stack_axis] = idx_slice
-                sel_idcs = tuple(sel_idcs)
-
-                if spacing_mm is None:
-                    sel_spacing = None
-                else:
-                    sel_spacing = (list(spacing_mm[:stack_axis]) +
-                                   list(spacing_mm[stack_axis+1:]))
-                sel_mask = mask[sel_idcs]
-                sel_res = _local_thickness(sel_mask, spacing_mm=sel_spacing,
-                                           return_med_axis=True, return_distance=True)
-                acc_med.append(sel_res[1])
-                acc_dist.append(sel_res[2])
-                acc_out.append(sel_res[0] / 2)
-
-            med_axis = np.stack(acc_med, axis=stack_axis)
-            distance = np.stack(acc_dist, axis=stack_axis)
-            out = np.stack(acc_out, axis=stack_axis)
-
-        elif mode == 'med2d_dist2d_lth3d':
-            if thickness_max_mm is not None:
-                msg = f'`thickness_max_mm` is not supported in mode {mode}'
-                raise NotImplementedError()
-
-            acc_med = []
-            acc_dist = []
-
-            for idx_slice in range(mask.shape[stack_axis]):
-                sel_idcs = [slice(None), ] * mask.ndim
-                sel_idcs[stack_axis] = idx_slice
-                sel_idcs = tuple(sel_idcs)
-
-                sel_med = morphology.medial_axis(mask[sel_idcs])
-                sel_dist = ndi.distance_transform_edt(mask[sel_idcs], sampling=spacing_mm)
-                acc_med.append(sel_med)
-                acc_dist.append(sel_dist)
-
-            med_axis = np.stack(acc_med, axis=stack_axis)
-            distance = np.stack(acc_dist, axis=stack_axis)
-
-            out = _local_thick_3d(mask=mask, med_axis=med_axis, distance=distance)
-
-        elif mode == 'med2d_dist3d_lth3d':
-            acc_med = []
-
-            for idx_slice in range(mask.shape[stack_axis]):
-                sel_idcs = [slice(None), ] * mask.ndim
-                sel_idcs[stack_axis] = idx_slice
-                sel_idcs = tuple(sel_idcs)
-
-                sel_res = morphology.medial_axis(mask[sel_idcs])
-                acc_med.append(sel_res)
-
-            med_axis = np.stack(acc_med, axis=stack_axis)
-            distance = ndi.distance_transform_edt(mask, sampling=spacing_mm)
-            out = _local_thick_3d(mask=mask, med_axis=med_axis, distance=distance,
-                                  search_extent=search_extent)
-
-        elif mode == 'exact_3d':
-            raise NotImplementedError(f'Mode {mode} is not yet supported')
-
-        else:
-            raise ValueError(f'Invalid mode: {mode}')
-
-    else:
-        msg = 'Only 2D and 3D arrays are supported'
-        raise ValueError(msg)
-
-    # Thickness is twice the distance to the closest surface point
-    out = 2 * out
-
-    if return_med_axis:
-        if return_distance:
-            return out, med_axis, distance
-        else:
-            return out, med_axis
-    else:
-        if return_distance:
-            return out, distance
-        else:
-            return out
-
-
-def local_thickness(input_, num_classes, stack_axis, spacing_mm=(1, 1, 1),
-                    skip_classes=None):
-    """
-    Args:
-        input_: (b, d0, ..., dn) ndarray or tensor
-        num_classes: int
-            Total number of classes.
-        stack_axis: int
-            Index of axis to perform slice selection along. Ignored for 2D.
-        spacing_mm: 3-tuple
-            Pixel spacing in mm, one per each spatial dimension of `input_`.
-        skip_classes: None or tuple of ints
-    Returns:
-        out: (b, d0, ..., dn) ndarray
-            Thickness map for each class in each batch sample.
-    """
-    if skip_classes is None:
-        skip_classes = tuple()
-
-    if torch.is_tensor(input_):
-        num_samples = tuple(input_.size())[0]
-        dims = tuple(input_.size())[1:]
-    else:
-        num_samples = input_.shape[0]
-        dims = input_.shape[1:]
-
-    th_maps = np.zeros((num_samples, *dims))
-
-    for sample_idx in range(num_samples):
-        th_map = np.zeros_like(input_[sample_idx])
-
-        for class_idx in range(num_classes):
-            if class_idx in skip_classes:
-                continue
-
-            sel_input_ = input_[sample_idx] == class_idx
-
-            th_map_class = _local_thickness(
-                sel_input_, mode='med2d_dist3d_lth3d',
-                spacing_mm=spacing_mm, stack_axis=stack_axis,
-                return_med_axis=False, return_distance=False)
-
-            th_map[sel_input_] = th_map_class[sel_input_]
-        th_maps[sample_idx, :] = th_map
-
-    return th_maps
 
 
 if __name__ == '__main__':
@@ -312,53 +25,93 @@ if __name__ == '__main__':
     start = time()
     # base_path = Path('../../../Data/µCT')
     base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Full dataset')
+    filter_size = 3
     parser = argparse.ArgumentParser()
     parser.add_argument('--images', type=Path, default=base_path / 'CC_window_rec')
     parser.add_argument('--masks', type=Path, default=base_path / 'Predictions_FPN_Resnet18')
-    parser.add_argument('--th_maps', type=Path, default=base_path / 'thickness_CTRL')
+    parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}')
     parser.add_argument('--plot', type=bool, default=True)
-    parser.add_argument('--resolution', type=tuple, default=(3.2, 3.2, 3.2))  # in µm
-    parser.add_argument('--uCT', type=bool, default=True)
+    parser.add_argument('--save_h5', type=bool, default=True)
+    #parser.add_argument('--resolution', type=tuple, default=(3.2, 3.2, 3.2))  # in µm
+    parser.add_argument('--resolution', type=tuple, default=(12.8, 12.8, 12.8))  # in µm
+    parser.add_argument('--mode', type=str,
+                        choices=['med2d_dist3d_lth3d', 'stacked_2d', 'med2d_dist2d_lth3d', 'med2d_dist3d_lth3d'],
+                        default='stacked_2d')
+    parser.add_argument('--max_th', type=float, default=None)  # in µm
+    parser.add_argument('--median', type=int, default=filter_size)
+    parser.add_argument('--completed', type=int, default=0)
     args = parser.parse_args()
 
-    if args.uCT:
-        samples = os.listdir(args.images)
-        samples.sort()
-        args.th_maps.mkdir(exist_ok=True)
-        (args.th_maps / 'visualization').mkdir(exist_ok=True)
-        for sample in samples:
-            pred, files = load(str(args.masks / sample), axis=(1, 2, 0,))
-            print_orthogonal(pred)
-            save(str(args.th_maps / sample), sample, pred)
-            th_map = _local_thickness(pred, spacing_mm=args.resolution, stack_axis=0)
+    # Sample list
+    samples = os.listdir(args.images)
+    samples.sort()
+    if args.completed > 0:
+        samples = samples[args.completed:]
 
-            if args.plot:
-                print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_pred.png')))
-                print_orthogonal(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map.png')))
-                #render_volume(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map_render.png')))
+    # Save paths
+    args.th_maps.mkdir(exist_ok=True)
+    (args.th_maps / 'visualization').mkdir(exist_ok=True)
+    (args.th_maps / 'h5').mkdir(exist_ok=True)
 
-            save(str(args.th_maps / sample), sample, th_map)
+    results = {'Sample': [], 'Mean thickness': [], 'Median thickness': [], 'Thickness STD': [],'Maximum thickness': []}
+    t = strftime(f'%Y_%m_%d_%H_%M')
 
-    else:
-        nii_3d_in = nib.load(('/home/egor/Workspace/p01_cartilage_segmentation/results/'
-                              '20190720_0001/predicts_oai_prj_22_test/'
-                              '9002817/0.C.2/sag_3d_dess_we/mask_foldavg_biomediq.nii'))
+    # Loop for samples
+    for sample in samples:
+        time_sample = time()
+        print(f'Processing sample {sample}')
 
-        x_3d = nii_3d_in.get_fdata()
-        x_3d = np.isin(x_3d, (8, 9))  # full femoral
+        # Load prediction
+        pred, files = load(str(args.masks / sample), axis=(1, 2, 0,))
 
-        spacings = (0.7, 0.365, 0.365)  # OAI
+        # Downscale
+        pred = ndi.zoom(pred, 0.25)
 
-        th_3d = _local_thickness(x_3d, mode='med2d_dist3d_lth3d', stack_axis=0,
-                                 spacing_mm=spacings)
-                                 # thickness_max_mm=10)
+        if args.plot:
+            print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_pred.png')))
 
-        # Save the results
-        fname = f'thickness_output.nii'
-        numpy_to_nifti(th_3d,
-                       Path('/home/egor/Workspace/_experim/thickness', fname),
-                       spacings=spacings,
-                       rcp_to_ras=True)
+        # Median filter
+        pred = ndi.median_filter(pred, size=args.median)
+        if args.plot:
+            print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_median.png')))
+
+        # Thickness analysis
+        th_map = _local_thickness(pred // 255, mode=args.mode, spacing_mm=args.resolution, stack_axis=1,
+                                  thickness_max_mm=args.max_th)
+        if args.plot:
+            print_orthogonal(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map.png')),
+                             cmap='hot')
+
+        plt.hist(x=th_map[np.nonzero(th_map)].flatten(), bins='auto')
+        plt.show()
+
+
+        # Save resulting thickness map with bmp and h5py
+        save(str(args.th_maps / sample), sample, th_map, dtype='.bmp')
+
+        # H5PY save
+        if args.save_h5:
+            savepath = args.th_maps / 'h5' / (sample + '.h5')
+            h5 = h5py.File(str(savepath), 'w')
+            h5.create_dataset('data', data=th_map)
+            h5.close()
+
+        # Update results
+        th_map = th_map[np.nonzero(th_map)].flatten()
+        results['Sample'].append(sample)
+        results['Mean thickness'].append(np.mean(th_map))
+        results['Median thickness'].append(np.median(th_map))
+        results['Maximum thickness'].append(np.max(th_map))
+        results['Thickness STD'].append(np.std(th_map))
+
+        # Save results to excel
+        writer = pd.ExcelWriter(str(args.th_maps / ('Results_' + t)) + '.xlsx')
+        df1 = pd.DataFrame(results)
+        df1.to_excel(writer, sheet_name='Thickness analysis')
+        writer.save()
+
+        dur_sample = time() - time_sample
+        print(f'Sample processed in {(dur_sample % 3600) // 60} minutes, {dur_sample % 60} seconds.')
 
     dur = time() - start
     print(f'Analysis completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

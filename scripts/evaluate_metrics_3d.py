@@ -36,7 +36,7 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     snaps = os.listdir(str(args.prediction_path))
     snaps.sort()
-    snaps = [snaps[-1]]
+    #snaps = [snaps[-1]]
 
     # Iterate through snapshots
     args.save_dir.mkdir(exist_ok=True)

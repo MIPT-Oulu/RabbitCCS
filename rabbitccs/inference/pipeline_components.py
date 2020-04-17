@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import torch
 import gc
+import os
 import cv2
 
 from skimage import measure
@@ -12,6 +14,9 @@ from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
 from rabbitccs.inference.model_components import InferenceModel, load_models
+from rabbitccs.data.utilities import load, print_orthogonal, print_images
+from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
+    calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
 
 
 def inference(inference_model, args, config, img_full, device='cuda', weight='mean', plot=False, mean=None, std=None):
@@ -51,7 +56,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
         merger.integrate_batch(pred_batch, coords_batch)
 
         # Plot
-        if args.plot:
+        if plot:
             for i in range(args.bs):
                 if args.bs != 1:
                     plt.imshow(pred_batch.cpu().detach().numpy().astype('float32').squeeze()[i, :, :])
@@ -63,7 +68,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
     merged_mask = tiler.crop_to_orignal_size(merged_mask)
     # Plot
-    if args.plot:
+    if plot:
         for i in range(args.bs):
             if args.bs != 1:
                 plt.imshow(merged_mask)
@@ -89,7 +94,7 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
     :return:
     """
     # Timing
-    start = time()
+    start_inf = time()
 
     # Inference arguments
     args.images = args.data_location / 'images'
@@ -151,8 +156,97 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
             torch.cuda.empty_cache()
             gc.collect()
 
-    dur = time() - start
-    print(f'Inference completed in {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
+    dur_inf = time() - start_inf
+    print(f'Inference completed in {(dur_inf % 3600) // 60} minutes, {dur_inf % 60} seconds.')
+    return save_dir
+
+
+def evaluation_runner(args, config, save_dir):
+    start_eval = time()
+
+    # Evaluation arguments
+    args.image_path = args.data_location / 'images'
+    args.mask_path = args.data_location / 'masks'
+    args.pred_path = args.data_location / 'predictions'
+    args.save_dir = args.data_location / 'evaluation'
+    args.save_dir.mkdir(exist_ok=True)
+    args.n_labels = 2
+
+    # Snapshots to be evaluated
+    if type(save_dir) != list:
+        save_dir = [save_dir]
+
+    # Iterate through snapshots
+    for snap in save_dir:
+
+        # Initialize results
+        results = {'Sample': [], 'Dice': [], 'IoU': [], 'Similarity': []}
+
+        # Loop for samples
+        (args.save_dir / ('visualizations_' + snap)).mkdir(exist_ok=True)
+        samples = os.listdir(str(args.mask_path))
+        samples.sort()
+        for idx, sample in enumerate(samples):
+
+            print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
+
+            # Load image stacks
+            if config['training']['experiment'] == '3D':
+                mask, files_mask = load(str(args.mask_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
+
+                pred, files_pred = load(str(args.pred_path / snap / sample), axis=(0, 2, 1), rgb=False,
+                                        n_jobs=args.n_threads)
+                data, files_data = load(str(args.image_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
+            else:
+                data = cv2.imread(str(args.image_path / sample))
+                mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
+                pred = cv2.imread(str(args.pred_path / snap / sample), cv2.IMREAD_GRAYSCALE)
+
+            # Crop in case of inconsistency
+            crop = min(pred.shape, mask.shape)
+            mask = mask[:crop[0], :crop[1], :crop[2]]
+            pred = pred[:crop[0], :crop[1], :crop[2]]
+
+            # Evaluate metrics
+            conf_matrix = calculate_conf(pred.astype(np.bool), mask.astype(np.bool), args.n_labels)
+            dice = calculate_dice(conf_matrix)[1]
+            iou = calculate_iou(conf_matrix)[1]
+            sim = calculate_volumetric_similarity(conf_matrix)[1]
+
+            print(f'Sample {sample}: dice = {dice}, IoU = {iou}, similarity = {sim}')
+
+            # Save predicted full mask
+            if config['training']['experiment'] == '3D':
+                print_orthogonal(data, invert=False, res=3.2, cbar=True,
+                                 savepath=str(args.save_dir / ('visualizations_' + snap) / (sample + '_input.png')),
+                                 scale_factor=1500)
+                print_orthogonal(data, mask=mask, invert=False, res=3.2, cbar=True,
+                                 savepath=str(args.save_dir / ('visualizations_' + snap) / (sample + '_reference.png')),
+                                 scale_factor=1500)
+                print_orthogonal(data, mask=pred, invert=False, res=3.2, cbar=True,
+                                 savepath=str(
+                                     args.save_dir / ('visualizations_' + snap) / (sample + '_prediction.png')),
+                                 scale_factor=1500)
+
+            # Update results
+            results['Sample'].append(sample)
+            results['Dice'].append(dice)
+            results['IoU'].append(iou)
+            results['Similarity'].append(sim)
+
+        # Add average value to
+        results['Sample'].append('Average values')
+        results['Dice'].append(np.average(results['Dice']))
+        results['IoU'].append(np.average(results['IoU']))
+        results['Similarity'].append(np.average(results['Similarity']))
+
+        # Write to excel
+        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap))) + '.xlsx')
+        df1 = pd.DataFrame(results)
+        df1.to_excel(writer, sheet_name='Metrics')
+        writer.save()
+
+        print(f'Metrics evaluated in {(time() - start_eval) // 60} minutes, {(time() - start_eval) % 60} seconds.')
 
 
 def largest_object(input_mask):
