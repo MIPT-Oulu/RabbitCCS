@@ -35,8 +35,8 @@ if __name__ == '__main__':
     #parser.add_argument('--resolution', type=tuple, default=(3.2, 3.2, 3.2))  # in µm
     parser.add_argument('--resolution', type=tuple, default=(12.8, 12.8, 12.8))  # in µm
     parser.add_argument('--mode', type=str,
-                        choices=['med2d_dist3d_lth3d', 'stacked_2d', 'med2d_dist2d_lth3d', 'med2d_dist3d_lth3d'],
-                        default='stacked_2d')
+                        choices=['med2d_dist3d_lth3d', 'stacked_2d', 'med2d_dist2d_lth3d'],
+                        default='med2d_dist3d_lth3d')
     parser.add_argument('--max_th', type=float, default=None)  # in µm
     parser.add_argument('--median', type=int, default=filter_size)
     parser.add_argument('--completed', type=int, default=0)
@@ -65,18 +65,19 @@ if __name__ == '__main__':
         pred, files = load(str(args.masks / sample), axis=(1, 2, 0,))
 
         # Downscale
-        pred = ndi.zoom(pred, 0.25)
+        pred = (ndi.zoom(pred, 0.25) > 126).astype(np.bool)
 
         if args.plot:
             print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_pred.png')))
 
         # Median filter
-        pred = ndi.median_filter(pred, size=args.median)
+        #pred = ndi.median_filter(pred, size=args.median)
         if args.plot:
             print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_median.png')))
 
         # Thickness analysis
-        th_map = _local_thickness(pred // 255, mode=args.mode, spacing_mm=args.resolution, stack_axis=1,
+        # Create array of correct size
+        th_map = _local_thickness(pred, mode=args.mode, spacing_mm=args.resolution, stack_axis=1,
                                   thickness_max_mm=args.max_th)
         if args.plot:
             print_orthogonal(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map.png')),

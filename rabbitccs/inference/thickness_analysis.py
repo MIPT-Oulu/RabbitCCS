@@ -47,7 +47,7 @@ def _local_thick_2d(mask, med_axis, distance, search_extent):
 
 
 @jit(nopython=True, parallel=True)
-def _local_thick_3d(mask, med_axis, distance, search_extent):
+def _local_thick_3d(mask, med_axis, distance, search_extent, sampling):
     out = np.zeros_like(mask, dtype=np.float32)
 
     nonzero_mask = np.nonzero(mask)
@@ -85,8 +85,12 @@ def _local_thick_3d(mask, med_axis, distance, search_extent):
             if search_extent is not None:
                 if m < r0 or m > r1 or n < c0 or n > c1 or o < p0 or o > p1:
                     continue
-
-            if ((i - m) ** 2 + (j - n) ** 2 + (k - o) ** 2) <= (distance[m, n, o] ** 2):
+            # Check if distance between mask and medial axis < distance to nearest edge
+            scaled_i = (i - m) * sampling[0]
+            scaled_j = (j - n) * sampling[1]
+            scaled_k = (k - o) * sampling[2]
+            if (scaled_i ** 2 + scaled_j ** 2 + scaled_k ** 2) <= (distance[m, n, o] ** 2):
+            #if ((i - m) ** 2 + (j - n) ** 2 + (k - o) ** 2) <= (distance[m, n, o] ** 2):
                 if distance[m, n, o] > best_vals[e]:
                     best_vals[e] = distance[m, n, o]
 
@@ -208,7 +212,7 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
             med_axis = np.stack(acc_med, axis=stack_axis)
             distance = np.stack(acc_dist, axis=stack_axis)
 
-            out = _local_thick_3d(mask=mask, med_axis=med_axis, distance=distance)
+            out = _local_thick_3d(mask=mask, med_axis=med_axis, distance=distance, search_extent=search_extent)
 
         elif mode == 'med2d_dist3d_lth3d':
             acc_med = []
@@ -222,10 +226,15 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
                 sel_res = morphology.medial_axis(mask[sel_idcs])
                 acc_med.append(sel_res)
 
+            # Medial axis
             med_axis = np.stack(acc_med, axis=stack_axis)
+            # Distance transform
             distance = ndi.distance_transform_edt(mask, sampling=spacing_mm)
+            # Local thickness
+            if type(spacing_mm) is tuple:
+                spacing_mm = np.array(spacing_mm)
             out = _local_thick_3d(mask=mask, med_axis=med_axis, distance=distance,
-                                  search_extent=search_extent)
+                                  search_extent=search_extent, sampling=spacing_mm)
 
         elif mode == 'exact_3d':
             raise NotImplementedError(f'Mode {mode} is not yet supported')
@@ -253,7 +262,7 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
 
 
 def local_thickness(input_, num_classes, stack_axis, spacing_mm=(1, 1, 1),
-                    skip_classes=None):
+                    skip_classes=None, mode='med2d_dist3d_lth3d', thickness_max_mm=None):
     """
     Args:
         input_: (b, d0, ..., dn) ndarray or tensor
@@ -290,9 +299,9 @@ def local_thickness(input_, num_classes, stack_axis, spacing_mm=(1, 1, 1),
             sel_input_ = input_[sample_idx] == class_idx
 
             th_map_class = _local_thickness(
-                sel_input_, mode='med2d_dist3d_lth3d',
+                sel_input_, mode=mode,
                 spacing_mm=spacing_mm, stack_axis=stack_axis,
-                return_med_axis=False, return_distance=False)
+                return_med_axis=False, return_distance=False, thickness_max_mm=thickness_max_mm)
 
             th_map[sel_input_] = th_map_class[sel_input_]
         th_maps[sample_idx, :] = th_map
