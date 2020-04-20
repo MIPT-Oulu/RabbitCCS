@@ -90,7 +90,6 @@ def _local_thick_3d(mask, med_axis, distance, search_extent, sampling):
             scaled_j = (j - n) * sampling[1]
             scaled_k = (k - o) * sampling[2]
             if (scaled_i ** 2 + scaled_j ** 2 + scaled_k ** 2) <= (distance[m, n, o] ** 2):
-            #if ((i - m) ** 2 + (j - n) ** 2 + (k - o) ** 2) <= (distance[m, n, o] ** 2):
                 if distance[m, n, o] > best_vals[e]:
                     best_vals[e] = distance[m, n, o]
 

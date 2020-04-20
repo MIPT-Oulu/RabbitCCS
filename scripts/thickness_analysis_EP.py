@@ -25,15 +25,15 @@ if __name__ == '__main__':
     start = time()
     # base_path = Path('../../../Data/µCT')
     base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Full dataset')
-    filter_size = 3
+    filter_size = 12
     parser = argparse.ArgumentParser()
     parser.add_argument('--images', type=Path, default=base_path / 'CC_window_rec')
     parser.add_argument('--masks', type=Path, default=base_path / 'Predictions_FPN_Resnet18')
     parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}')
     parser.add_argument('--plot', type=bool, default=True)
     parser.add_argument('--save_h5', type=bool, default=True)
-    #parser.add_argument('--resolution', type=tuple, default=(3.2, 3.2, 3.2))  # in µm
-    parser.add_argument('--resolution', type=tuple, default=(12.8, 12.8, 12.8))  # in µm
+    parser.add_argument('--resolution', type=tuple, default=(3.2, 3.2, 3.2))  # in µm
+    #parser.add_argument('--resolution', type=tuple, default=(12.8, 12.8, 12.8))  # in µm
     parser.add_argument('--mode', type=str,
                         choices=['med2d_dist3d_lth3d', 'stacked_2d', 'med2d_dist2d_lth3d'],
                         default='med2d_dist3d_lth3d')
@@ -65,13 +65,13 @@ if __name__ == '__main__':
         pred, files = load(str(args.masks / sample), axis=(1, 2, 0,))
 
         # Downscale
-        pred = (ndi.zoom(pred, 0.25) > 126).astype(np.bool)
+        #pred = (ndi.zoom(pred, 0.25) > 126).astype(np.bool)
 
         if args.plot:
             print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_pred.png')))
 
         # Median filter
-        #pred = ndi.median_filter(pred, size=args.median)
+        pred = ndi.median_filter(pred, size=args.median)
         if args.plot:
             print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_median.png')))
 
