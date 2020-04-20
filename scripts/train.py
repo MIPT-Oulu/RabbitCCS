@@ -15,7 +15,7 @@ from rabbitccs.training.session import create_data_provider, init_experiment, in
     init_loss, parse_grayscale, parse_color_im
 
 from rabbitccs.data.splits import build_splits
-from rabbitccs.inference.pipeline_components import inference_runner_oof
+from rabbitccs.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
             print(f'Encoder: {backbone}, decoder: {decoder}')
 
-            # Optimizer
+                    # Optimizer
             optimizer = optim.Adam(model.parameters(),
                                    lr=config['training']['lr'],
                                    weight_decay=config['training']['wd'])
@@ -102,7 +102,9 @@ if __name__ == "__main__":
         print(f'Model {experiment + 1} trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')
 
         if config['inference']['calc_inference']:
-            inference_runner_oof(args, config, splits_metadata, device)
+            save_dir = inference_runner_oof(args, config, splits_metadata, device)
+
+            evaluation_runner(args, config, save_dir)
 
     dur = time() - start
     print(f'Models trained in {dur // 3600} hours, {(dur % 3600) // 60} minutes, {dur % 60} seconds.')

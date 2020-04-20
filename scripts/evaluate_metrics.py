@@ -37,7 +37,6 @@ if __name__ == "__main__":
     # Snapshots to be evaluated
     snaps = os.listdir(str(args.prediction_path))
     snaps.sort()
-    snaps = [snaps[-1]]
 
     # Iterate through snapshots
     args.save_dir.mkdir(exist_ok=True)
@@ -50,16 +49,20 @@ if __name__ == "__main__":
         args.save_dir.mkdir(exist_ok=True)
         #samples = [os.path.basename(x) for x in glob(str(args.mask_path / '*XZ'))]
         samples_mask = os.listdir(str(args.mask_path))
-        samples_pred = os.listdir(str(args.prediction_path))
+        samples_pred = os.listdir(str(args.prediction_path / snap))
         samples_mask.sort()
         samples_pred.sort()
         for idx, sample in enumerate(samples_mask):
             sleep(0.5); print(f'==> Processing sample {idx + 1} of {len(samples_mask)}: {sample}')
 
             # Load image stacks
-            data = cv2.imread(str(args.image_path / sample))
-            mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
-            pred = cv2.imread(str(args.prediction_path / samples_pred[idx]), cv2.IMREAD_GRAYSCALE)
+            try:
+                data = cv2.imread(str(args.image_path / sample))
+                mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
+                pred = cv2.imread(str(args.prediction_path / snap / samples_pred[idx]), cv2.IMREAD_GRAYSCALE)
+            except IndexError:
+                print(f'Error on sample {sample}')
+                continue
 
             # Crop in case of inconsistency
             crop = min(pred.shape, mask.shape)
