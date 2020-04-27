@@ -7,7 +7,7 @@ import torch
 
 
 @jit(nopython=True)
-def _local_thick_2d(mask, med_axis, distance, search_extent):
+def _local_thick_2d(mask, med_axis, distance, search_extent, sampling):
     out = np.zeros_like(mask, dtype=np.float32)
 
     nonzero_x = np.nonzero(mask)
@@ -38,7 +38,10 @@ def _local_thick_2d(mask, med_axis, distance, search_extent):
                 if m < r0 or m > r1 or n < c0 or n > c1:
                     continue
 
-            if ((i - m) ** 2 + (j - n) ** 2) < (distance[m, n] ** 2):
+            scaled_i = (i - m) * sampling[0]
+            scaled_j = (j - n) * sampling[1]
+
+            if (scaled_i ** 2 + scaled_j ** 2) < (distance[m, n] ** 2):
                 if distance[m, n] > best_val:
                     best_val = distance[m, n]
 
@@ -144,7 +147,7 @@ def _local_thickness(mask, *, mode='med2d_dist3d_lth3d',
         med_axis = morphology.medial_axis(mask)
         distance = ndi.distance_transform_edt(mask, sampling=spacing_mm)
         out = _local_thick_2d(mask=mask, med_axis=med_axis, distance=distance,
-                              search_extent=search_extent)
+                              search_extent=search_extent, sampling=spacing_mm)
 
     elif mask.ndim == 3:
         if mode == 'straight_skel_3d':

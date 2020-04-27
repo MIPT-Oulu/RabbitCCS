@@ -29,13 +29,13 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL')
-    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet')
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_ACLT')
+    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold')
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--gpus', type=int, default=2)
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
-    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_04_07_15_41_37_2D_resnet34_UNet/')
+    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_04_23_13_58_05_2D_resnet34_UNet/')
     args = parser.parse_args()
     threshold = 0.8
 
@@ -72,12 +72,16 @@ if __name__ == "__main__":
         x, y, ch = img_full.shape
         mask_full = np.zeros((x, y))
 
+        # Avoid tiling artefacts
+        mask_full = np.zeros(img_full.shape[:2])
+        img_crop = img_full[:input_y, :]
+
         # Cut large image into overlapping tiles
-        tiler = ImageSlicer(img_full.shape, tile_size=(input_x, input_y),
+        tiler = ImageSlicer(img_crop.shape, tile_size=(input_x, input_y),
                             tile_step=(input_x // 2, input_y // 2), weight=args.weight)
 
         # HCW -> CHW. Optionally, do normalization here
-        tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_full)]
+        tiles = [tensor_from_rgb_image(tile) for tile in tiler.split(img_crop)]
 
         # Allocate a CUDA buffer for holding entire mask
         merger = CudaTileMerger(tiler.target_shape, channels=1, weight=tiler.weight)
@@ -107,17 +111,20 @@ if __name__ == "__main__":
         # Normalize accumulated mask and convert back to numpy
         merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
         merged_mask = tiler.crop_to_orignal_size(merged_mask)
+
+        mask_full[:input_y, :] = merged_mask.squeeze()
+
         # Plot
         if args.plot:
             for i in range(args.bs):
                 if args.bs != 1:
-                    plt.imshow(merged_mask)
+                    plt.imshow(mask_full)
                 else:
-                    plt.imshow(merged_mask.squeeze())
+                    plt.imshow(mask_full.squeeze())
                 plt.show()
 
         # Average of predictions
-        mask_final = (merged_mask >= threshold).astype('uint8') * 255
+        mask_final = (mask_full >= threshold).astype('uint8') * 255
 
         # Save largest mask
         largest_mask = largest_object(mask_final)

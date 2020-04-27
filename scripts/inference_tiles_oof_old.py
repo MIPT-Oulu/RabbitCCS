@@ -15,6 +15,7 @@ from collagen.modelzoo.segmentation import EncoderDecoder
 from collagen.core.utils import auto_detect_device
 from rabbitccs.data.transforms import numpy2tens
 from rabbitccs.data.utilities import load_images as load, save_images as save, bounding_box, largest_object
+from rabbitccs.inference.model_components import InferenceModel, load_models
 
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
@@ -54,6 +55,7 @@ if __name__ == "__main__":
 
     with open(args.snapshot / 'split_config.dill', 'rb') as f:
         split_config = dill.load(f)
+
 
     # Load models
     models = glob(str(args.snapshot) + '/*fold_*.pth')

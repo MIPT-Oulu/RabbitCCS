@@ -8,6 +8,7 @@ import cv2
 
 from skimage import measure
 from time import time
+from copy import deepcopy
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
@@ -117,8 +118,6 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
     # Load models
     unet = config['model']['decoder'].lower() == 'unet'
     model_list = load_models(str(args.snapshots_dir / config['training']['snapshot']), config, unet=unet, n_gpus=args.gpus)
-    model = InferenceModel(model_list).to(device)
-    model.eval()
     print(f'Found {len(model_list)} models.')
 
     # Loop for all images
@@ -126,13 +125,18 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
         # List validation images
         validation_files = split_config[f'fold_{fold}']['val'].fname.values
 
+        # Model without validation fold
+        model = InferenceModel([model_list[fold]]).to(device)
+        model.eval()
+
         for file in tqdm(validation_files, desc=f'Running inference for fold {fold}'):
             img_full = cv2.imread(str(file))
 
             with torch.no_grad():  # Do not update gradients
                 merged_mask = inference(model, args, config, img_full, weight=weight, device=device, plot=plot)
 
-            th = threshold.copy()
+            # Copy list of thresholds
+            th = deepcopy(threshold)
             for ind in range(len_th):
                 # Save multiple thresholds
                 if len_th > 1:
@@ -183,56 +187,72 @@ def evaluation_runner(args, config, save_dir):
         results = {'Sample': [], 'Dice': [], 'IoU': [], 'Similarity': []}
 
         # Loop for samples
-        (args.save_dir / ('visualizations_' + snap)).mkdir(exist_ok=True)
+        (args.save_dir / ('visualizations_' + snap.name)).mkdir(exist_ok=True)
         samples = os.listdir(str(args.mask_path))
         samples.sort()
-        for idx, sample in enumerate(samples):
+        try:
+            for idx, sample in enumerate(samples):
 
-            print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
+                print(f'==> Processing sample {idx + 1} of {len(samples)}: {sample}')
 
-            # Load image stacks
-            if config['training']['experiment'] == '3D':
-                mask, files_mask = load(str(args.mask_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
+                # Load image stacks
+                if config['training']['experiment'] == '3D':
+                    mask, files_mask = load(str(args.mask_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
 
-                pred, files_pred = load(str(args.pred_path / snap / sample), axis=(0, 2, 1), rgb=False,
-                                        n_jobs=args.n_threads)
-                data, files_data = load(str(args.image_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
-            else:
-                data = cv2.imread(str(args.image_path / sample))
-                mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
-                pred = cv2.imread(str(args.pred_path / snap / sample), cv2.IMREAD_GRAYSCALE)
+                    pred, files_pred = load(str(args.pred_path / snap.name / sample), axis=(0, 2, 1), rgb=False,
+                                            n_jobs=args.n_threads)
+                    data, files_data = load(str(args.image_path / sample), axis=(0, 2, 1), rgb=False, n_jobs=args.n_threads)
 
-            # Crop in case of inconsistency
-            crop = min(pred.shape, mask.shape)
-            mask = mask[:crop[0], :crop[1], :crop[2]]
-            pred = pred[:crop[0], :crop[1], :crop[2]]
+                    # Crop in case of inconsistency
+                    crop = min(pred.shape, mask.shape)
+                    mask = mask[:crop[0], :crop[1], :crop[2]]
+                    pred = pred[:crop[0], :crop[1], :crop[2]]
 
-            # Evaluate metrics
-            conf_matrix = calculate_conf(pred.astype(np.bool), mask.astype(np.bool), args.n_labels)
-            dice = calculate_dice(conf_matrix)[1]
-            iou = calculate_iou(conf_matrix)[1]
-            sim = calculate_volumetric_similarity(conf_matrix)[1]
+                else:
+                    data = cv2.imread(str(args.image_path / sample))
+                    mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
+                    pred = cv2.imread(str(args.pred_path / snap.name / sample), cv2.IMREAD_GRAYSCALE)
+                    if pred is None:
+                        sample = sample[:-4] + '.bmp'
+                        pred = cv2.imread(str(args.pred_path / snap.name / sample), cv2.IMREAD_GRAYSCALE)
+                    elif mask is None:
+                        mask = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
 
-            print(f'Sample {sample}: dice = {dice}, IoU = {iou}, similarity = {sim}')
+                    # Crop in case of inconsistency
+                    crop = min(pred.shape, mask.shape)
+                    mask = mask[:crop[0], :crop[1]]
+                    pred = pred[:crop[0], :crop[1]]
 
-            # Save predicted full mask
-            if config['training']['experiment'] == '3D':
-                print_orthogonal(data, invert=False, res=3.2, cbar=True,
-                                 savepath=str(args.save_dir / ('visualizations_' + snap) / (sample + '_input.png')),
-                                 scale_factor=1500)
-                print_orthogonal(data, mask=mask, invert=False, res=3.2, cbar=True,
-                                 savepath=str(args.save_dir / ('visualizations_' + snap) / (sample + '_reference.png')),
-                                 scale_factor=1500)
-                print_orthogonal(data, mask=pred, invert=False, res=3.2, cbar=True,
-                                 savepath=str(
-                                     args.save_dir / ('visualizations_' + snap) / (sample + '_prediction.png')),
-                                 scale_factor=1500)
+                # Evaluate metrics
+                conf_matrix = calculate_conf(pred.astype(np.bool), mask.astype(np.bool), args.n_labels)
+                dice = calculate_dice(conf_matrix)[1]
+                iou = calculate_iou(conf_matrix)[1]
+                sim = calculate_volumetric_similarity(conf_matrix)[1]
 
-            # Update results
-            results['Sample'].append(sample)
-            results['Dice'].append(dice)
-            results['IoU'].append(iou)
-            results['Similarity'].append(sim)
+                print(f'Sample {sample}: dice = {dice}, IoU = {iou}, similarity = {sim}')
+
+                # Save predicted full mask
+                if config['training']['experiment'] == '3D':
+                    print_orthogonal(data, invert=False, res=3.2, cbar=True,
+                                     savepath=str(args.save_dir / ('visualizations_' + snap.name) / (sample + '_input.png')),
+                                     scale_factor=1500)
+                    print_orthogonal(data, mask=mask, invert=False, res=3.2, cbar=True,
+                                     savepath=str(args.save_dir / ('visualizations_' + snap.name) / (sample + '_reference.png')),
+                                     scale_factor=1500)
+                    print_orthogonal(data, mask=pred, invert=False, res=3.2, cbar=True,
+                                     savepath=str(
+                                         args.save_dir / ('visualizations_' + snap.name) / (sample + '_prediction.png')),
+                                     scale_factor=1500)
+
+                # Update results
+                results['Sample'].append(sample)
+                results['Dice'].append(dice)
+                results['IoU'].append(iou)
+                results['Similarity'].append(sim)
+
+        except AttributeError:
+            print(f'Sample {sample} failing. Skipping to next one.')
+            continue
 
         # Add average value to
         results['Sample'].append('Average values')
@@ -241,7 +261,7 @@ def evaluation_runner(args, config, save_dir):
         results['Similarity'].append(np.average(results['Similarity']))
 
         # Write to excel
-        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap))) + '.xlsx')
+        writer = pd.ExcelWriter(str(args.save_dir / ('metrics_' + str(snap.name))) + '.xlsx')
         df1 = pd.DataFrame(results)
         df1.to_excel(writer, sheet_name='Metrics')
         writer.save()

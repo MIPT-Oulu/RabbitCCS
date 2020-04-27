@@ -1,7 +1,9 @@
+import cv2
 import os
 import h5py
 import matplotlib.pyplot as plt
 from pathlib import Path
+from glob import glob
 from time import time, strftime
 import pandas as pd
 
@@ -14,30 +16,24 @@ from rabbitccs.inference.thickness_analysis import _local_thickness
 
 
 if __name__ == '__main__':
-    # ******************************** 3D case ************************************
     start = time()
     # base_path = Path('../../../Data/µCT')
-    base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Full dataset')
+    base_path = Path('/media/dios/dios2/RabbitSegmentation/Histology/Rabbits')
     filter_size = 12
     parser = argparse.ArgumentParser()
-    parser.add_argument('--masks', type=Path, default=base_path / 'Predictions_FPN_Resnet18_OA')
+    parser.add_argument('--masks', type=Path, default=base_path / 'Predictions_resnet34_UNet')
     parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}')
     parser.add_argument('--plot', type=bool, default=True)
-    parser.add_argument('--save_h5', type=bool, default=True)
+    parser.add_argument('--save_h5', type=bool, default=False)
     parser.add_argument('--batch_id', type=int, default=None)
-    parser.add_argument('--resolution', type=tuple, default=(3.2, 3.2, 3.2))  # in µm
-    #parser.add_argument('--resolution', type=tuple, default=(12.8, 12.8, 12.8))  # in µm
-    parser.add_argument('--mode', type=str,
-                        choices=['med2d_dist3d_lth3d', 'stacked_2d', 'med2d_dist2d_lth3d'],
-                        default='med2d_dist3d_lth3d')
-    parser.add_argument('--max_th', type=float, default=None)  # in µm
+    parser.add_argument('--resolution', type=tuple, default=(2.56, 2.56))  # in µm
     parser.add_argument('--median', type=int, default=filter_size)
     parser.add_argument('--completed', type=int, default=0)
 
     args = parser.parse_args()
 
     # Sample list
-    samples = os.listdir(args.masks)
+    samples = glob(str(args.masks) + '/*.[pb][nm][gp]')
     samples.sort()
     if args.batch_id is not None:
         samples = [samples[args.batch_id]]
@@ -58,33 +54,37 @@ if __name__ == '__main__':
         print(f'Processing sample {sample}')
 
         # Load prediction
-        pred, files = load(str(args.masks / sample), axis=(1, 2, 0,))
-
-        # Downscale
-        #pred = (ndi.zoom(pred, 0.25) > 126).astype(np.bool)
+        pred = cv2.imread(sample, cv2.IMREAD_GRAYSCALE)
+        sample = os.path.basename(sample)[:-4]
 
         if args.plot:
-            print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_pred.png')))
+            plt.imshow(pred, cmap='gray')
+            plt.savefig(str(args.th_maps / 'visualization' / (sample + '_input.png')))
+            plt.close()
 
         # Median filter
         pred = ndi.median_filter(pred, size=args.median)
         if args.plot:
-            print_orthogonal(pred, savepath=str(args.th_maps / 'visualization' / (sample + '_median.png')))
+            plt.imshow(pred, cmap='gray')
+            plt.savefig(str(args.th_maps / 'visualization' / (sample + '_median.png')))
+            plt.close()
 
         # Thickness analysis
         # Create array of correct size
-        th_map = _local_thickness(pred, mode=args.mode, spacing_mm=args.resolution, stack_axis=1,
-                                  thickness_max_mm=args.max_th)
+        th_map = _local_thickness(pred, mode=None, spacing_mm=args.resolution, stack_axis=1)
+
         if args.plot:
-            print_orthogonal(th_map, savepath=str(args.th_maps / 'visualization' / (sample + '_th_map.png')),
-                             cmap='hot')
+            plt.imshow(th_map, cmap='hot')
+            plt.savefig(str(args.th_maps / 'visualization' / (sample + '_th_map.png')))
+            plt.close()
 
-        plt.hist(x=th_map[np.nonzero(th_map)].flatten(), bins='auto')
-        plt.show()
-
+            plt.hist(x=th_map[np.nonzero(th_map)].flatten(), bins=30, density=True)
+            plt.xlabel('Thickness (µm)')
+            plt.savefig(str(args.th_maps / 'visualization' / (sample + '_histogram.png')))
+            plt.show()
 
         # Save resulting thickness map with bmp and h5py
-        save(str(args.th_maps / sample), sample, th_map, dtype='.bmp')
+        cv2.imwrite(str(args.th_maps / sample) + '_th_map.bmp', th_map)
 
         # H5PY save
         if args.save_h5:

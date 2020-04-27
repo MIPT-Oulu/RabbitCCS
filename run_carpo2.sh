@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=thickness_uCT
+#SBATCH --job-name=thickness-uCT
 #SBATCH --mail-user=santeri.rytky@oulu.fi
 #SBATCH --mail-type=ALL
 #SBATCH --partition=medium
@@ -18,12 +18,12 @@ env_created=$(conda env list | grep $env_name)
 if [[ ! $env_created ]];
 then
 	eval "$(conda shell.bash hook)"
-	conda env create -f environment.yml
+	conda env create -f requirements.txt
 fi
 eval "$(conda shell.bash hook)"
 module load GCC/8.2.0-2.31.1
 module load OpenMPI/3.1.3-GCC-8.2.0-2.31.1
 conda activate carpo
 echo "Start the job..."
-srun ./interim_carpo.sh
+python -m scripts.thickness_analysis_EP
 echo "Done the job!"

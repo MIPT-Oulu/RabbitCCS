@@ -46,7 +46,6 @@ if __name__ == "__main__":
         results = {'Sample': [], 'Dice': [], 'IoU': [], 'Similarity': []}
 
         # Loop for samples
-        args.save_dir.mkdir(exist_ok=True)
         #samples = [os.path.basename(x) for x in glob(str(args.mask_path / '*XZ'))]
         samples_mask = os.listdir(str(args.mask_path))
         samples_pred = os.listdir(str(args.prediction_path / snap))
