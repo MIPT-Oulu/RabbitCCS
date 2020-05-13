@@ -29,15 +29,17 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_ACLT')
-    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold')
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/New folder')
+    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_extra')
     parser.add_argument('--bs', type=int, default=4)
     parser.add_argument('--gpus', type=int, default=2)
+    parser.add_argument('--despeckle', type=int, default=500)  # Give None to leave the largest object
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
     parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_04_23_13_58_05_2D_resnet34_UNet/')
+    #parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_04_03_07_25_01_FPN_resnet18/')
     args = parser.parse_args()
-    threshold = 0.8
+    threshold = 0.5
 
     # Load snapshot configuration
     with open(args.snapshot / 'config.yml', 'r') as f:
@@ -74,7 +76,8 @@ if __name__ == "__main__":
 
         # Avoid tiling artefacts
         mask_full = np.zeros(img_full.shape[:2])
-        img_crop = img_full[:input_y, :]
+        crop = 1
+        img_crop = img_full[crop:-crop, :]
 
         # Cut large image into overlapping tiles
         tiler = ImageSlicer(img_crop.shape, tile_size=(input_x, input_y),
@@ -112,7 +115,7 @@ if __name__ == "__main__":
         merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
         merged_mask = tiler.crop_to_orignal_size(merged_mask)
 
-        mask_full[:input_y, :] = merged_mask.squeeze()
+        mask_full[crop:-crop, :] = merged_mask.squeeze()
 
         # Plot
         if args.plot:
@@ -127,7 +130,7 @@ if __name__ == "__main__":
         mask_final = (mask_full >= threshold).astype('uint8') * 255
 
         # Save largest mask
-        largest_mask = largest_object(mask_final)
+        largest_mask = largest_object(mask_final, area_limit=args.despeckle)
         cv2.imwrite(str(args.save_dir) + '/' + file.split('/')[-1][:-4] + '.bmp', largest_mask)
 
         # Save reference images (slows down the script)

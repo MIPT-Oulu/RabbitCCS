@@ -269,9 +269,11 @@ def evaluation_runner(args, config, save_dir):
         print(f'Metrics evaluated in {(time() - start_eval) // 60} minutes, {(time() - start_eval) % 60} seconds.')
 
 
-def largest_object(input_mask):
+def largest_object(input_mask, area_limit=None):
     """
-    Keeps only the largest connected component of a binary segmentation mask.
+    Keeps the largest connected component of a binary segmentation mask.
+
+    If area_limit is given, all disconnected components < area_limit are discarded.
     """
 
     output_mask = np.zeros(input_mask.shape, dtype=np.uint8)
@@ -288,9 +290,18 @@ def largest_object(input_mask):
         return input_mask
 
     area = [ele.area for ele in proportions]
-    largest_blob_ind = np.argmax(area)
-    largest_blob_label = proportions[largest_blob_ind].label
 
-    output_mask[blobs == largest_blob_label] = 255
+    if area_limit is not None:
+
+        for blob_ind, blob in enumerate(area):
+            if blob > area_limit:
+                label = proportions[blob_ind].label
+                output_mask[blobs == label] = 255
+
+    else:
+        largest_blob_ind = np.argmax(area)
+        largest_blob_label = proportions[largest_blob_ind].label
+
+        output_mask[blobs == largest_blob_label] = 255
 
     return output_mask

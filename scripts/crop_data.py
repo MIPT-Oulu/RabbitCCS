@@ -9,13 +9,14 @@ import pathlib
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset_root', type=pathlib.Path,
                     #default='/media/dios/dios2/RabbitSegmentation/µCT/images_test/8C_M1_lateral_condyle_XZ')
-                    default='/media/dios/dios2/RabbitSegmentation/Histology/Insaf_series/Images/Binned3/Binned2/Binned3')
+                    default='/media/dios/dios2/RabbitSegmentation/Manual segmentation/image')
 parser.add_argument('--mask_dir', type=pathlib.Path,
                     #default='/media/dios/dios2/RabbitSegmentation/µCT/predictions_4fold/8C_M1_lateral_condyle_XZ/Largest')
-                    default='/media/dios/dios2/RabbitSegmentation/Histology/Insaf_series/Masks/Binned3/Binned2/Binned3')
-parser.add_argument('--crop', type=str, default='value')
+                    default='/media/dios/dios2/RabbitSegmentation/Manual segmentation/mask')
+parser.add_argument('--crop', type=bool, default=False)
+parser.add_argument('--crop_method', type=str, default='bbox')
 parser.add_argument('--saved', type=bool, default=True)
-parser.add_argument('--plot', type=bool, default=False)
+parser.add_argument('--plot', type=bool, default=True)
 parser.add_argument('--largest', type=bool, default=False)
 args = parser.parse_args()
 
@@ -23,12 +24,13 @@ args = parser.parse_args()
 im_files, data = load(args.dataset_root, rgb=True, uCT=False)
 mask_files, mask = load(args.mask_dir, rgb=False, uCT=False)
 
+
 # Expand mask to 3 channels
 # mask_large = np.zeros((mask.shape[0], mask.shape[1], 3, mask.shape[2]))
 # for i in range(mask_large.shape[2]):
 #     mask_large[:, :, i, :] = mask
 
-if args.crop == 'bbox':
+if args.crop_method == 'bbox':
     # Get bounding box for masks and crop data + mask
     contours = []
     removed = 0
@@ -56,7 +58,7 @@ if args.crop == 'bbox':
                 cv2.drawContours(img, [contours[sample_id]], 0, (0, 0, 255), 2)
             else:
                 cv2.drawContours(img, contours[sample_id], -1, (0, 0, 255), 2)
-elif args.crop == 'value':
+elif args.crop_method == 'value':
     for sample in range(len(mask)):
         w, h = mask[sample].shape
         mask[sample] = mask[sample][w // 2:, :]
@@ -67,7 +69,7 @@ elif args.crop == 'value':
 # Save images
 if args.saved:
     #save_im = '/media/dios/dios2/HistologySegmentation/Images_cropped2'
-    save_im_ref = '/media/dios/dios2/RabbitSegmentation/µCT/predictions_4fold/8C_M1_lateral_condyle_XZ/Contour'
+    save_im_ref = '/media/dios/dios2/RabbitSegmentation/Manual segmentation/Contour'
     #save_mask = '/media/dios/dios2/HistologySegmentation/Masks_cropped2'
     save_im = str(args.dataset_root / 'crop')
     save_mask = str(args.mask_dir / 'crop')

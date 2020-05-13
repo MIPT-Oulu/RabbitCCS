@@ -18,11 +18,11 @@ from rabbitccs.inference.thickness_analysis import _local_thickness
 if __name__ == '__main__':
     start = time()
     # base_path = Path('../../../Data/µCT')
-    base_path = Path('/media/dios/dios2/RabbitSegmentation/Histology/Rabbits')
+    base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Manual vs auto')
     filter_size = 12
     parser = argparse.ArgumentParser()
-    parser.add_argument('--masks', type=Path, default=base_path / 'Predictions_resnet34_UNet')
-    parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}')
+    parser.add_argument('--masks', type=Path, default=base_path / 'masks')
+    parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}_manual')
     parser.add_argument('--plot', type=bool, default=True)
     parser.add_argument('--save_h5', type=bool, default=False)
     parser.add_argument('--batch_id', type=int, default=None)
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Sample list
-    samples = glob(str(args.masks) + '/*.[pb][nm][gp]')
+    samples = glob(str(args.masks) + '/**/*.[pb][nm][gp]', recursive=True)
     samples.sort()
     if args.batch_id is not None:
         samples = [samples[args.batch_id]]
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     (args.th_maps / 'visualization').mkdir(exist_ok=True)
     (args.th_maps / 'h5').mkdir(exist_ok=True)
 
-    results = {'Sample': [], 'Mean thickness': [], 'Median thickness': [], 'Thickness STD': [],'Maximum thickness': []}
+    results = {'Sample': [], 'Mean thickness': [], 'Median thickness': [], 'Thickness STD': [], 'Maximum thickness': []}
     t = strftime(f'%Y_%m_%d_%H_%M')
 
     # Loop for samples

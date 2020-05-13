@@ -2,11 +2,11 @@
 #SBATCH --job-name=RabbitThickness
 #SBATCH --account=project_2002147
 #SBATCH --partition=small
-#SBATCH --time=24:00:00
+#SBATCH --time=6:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
 #SBATCH --mem-per-cpu=16000
-#SBATCH --array=1-276
+#SBATCH --array=1-28
 
 module load gcc/8.3.0 cuda/10.1.168
 module load pytorch/1.4

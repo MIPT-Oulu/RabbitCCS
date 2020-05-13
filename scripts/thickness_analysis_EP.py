@@ -21,7 +21,7 @@ if __name__ == '__main__':
     filter_size = 12
     parser = argparse.ArgumentParser()
     parser.add_argument('--masks', type=Path, default=base_path / 'Predictions_FPN_Resnet18_OA')
-    parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}')
+    parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}_missing')
     parser.add_argument('--plot', type=bool, default=True)
     parser.add_argument('--save_h5', type=bool, default=True)
     parser.add_argument('--batch_id', type=int, default=None)

@@ -28,7 +28,7 @@ if __name__ == "__main__":
     start = time()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Full dataset/CC_window_OA')
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Full dataset/CC_window_OA_missing')
     #parser.add_argument('--dataset_root', type=Path, default='/media/santeri/Transcend1/Full samples/')
     parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Full dataset/Predictions_FPN_Resnet18_OA')
     parser.add_argument('--subdir', type=Path, choices=['NN_prediction', ''], default='')
@@ -68,6 +68,7 @@ if __name__ == "__main__":
     device = 'cuda'  # Use the second GPU for inference
 
     crop = config['training']['crop_size']
+    config['training']['bs'] = args.bs
     mean_std_path = args.snapshot.parent / f"mean_std_{crop[0]}x{crop[1]}.pth"
     tmp = torch.load(mean_std_path)
     mean, std = tmp['mean'], tmp['std']
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     # samples = [os.path.basename(x) for x in glob(str(args.dataset_root / '*XZ'))]  # Load with specific name
     samples = os.listdir(args.dataset_root)
     samples.sort()
-    # samples = [samples[id] for id in [7, 11]]  # Get intended samples from list
+    #samples = [samples[id] for id in [106]]  # Get intended samples from list
 
     # Skip the completed samples
     if args.completed > 0:
