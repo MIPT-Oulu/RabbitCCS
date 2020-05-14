@@ -2,6 +2,7 @@ import pathlib
 import argparse
 import yaml
 import numpy as np
+import matplotlib.pyplot as plt
 import time
 import socket
 import torch
@@ -91,7 +92,10 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
     prefix = f"{crop[0]}x{crop[1]}_fold_{fold_id}"
 
     # Set threshold
-    threshold = 0.3 if config['training']['log_jaccard'] else 0.5
+    if 'threshold' in config['training']:  # Threshold in config file
+        threshold = config['training']['threshold']
+    else:  # Not given
+        threshold = 0.3 if config['training']['log_jaccard'] else 0.5
 
     # Callbacks
     train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
@@ -121,13 +125,14 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
 
 def init_loss(config, device='cuda'):
-    if config['training']['loss'] == 'bce':
+    loss = config['training']['loss']
+    if loss == 'bce':
         return BCEWithLogitsLoss2d().to(device)
-    elif config['training']['loss'] == 'jaccard':
+    elif loss == 'jaccard':
         return SoftJaccardLoss(use_log=config['training']['log_jaccard']).to(device)
-    elif config['training']['loss'] == 'mse':
-        return nn.MSELoss.to(device)
-    elif config['training']['loss'] == 'combined':
+    elif loss == 'mse':
+        return nn.MSELoss().to(device)
+    elif loss == 'combined':
         return CombinedLoss([BCEWithLogitsLoss2d(),
                             SoftJaccardLoss(use_log=config['training']['log_jaccard'])]).to(device)
     else:
@@ -171,7 +176,34 @@ def parse_item_test(root, entry, transform, data_key, target_key):
     return {data_key: img}
 
 
-def parse_color_im(root, entry, transform, data_key, target_key):
+def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
+    # Image and mask generation
+    img = cv2.imread(str(entry.fname))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img[:, :, 1] = img[:, :, 0]
+    img[:, :, 2] = img[:, :, 0]
+    mask = cv2.imread(str(entry.mask_fname), 0) / 255.
+
+    if img.shape[0] != mask.shape[0]:
+        img = cv2.resize(img, (mask.shape[1], mask.shape[0]))
+    elif img.shape[1] != mask.shape[1]:
+        mask = mask[:, :img.shape[1]]
+
+    img, mask = transform((img, mask))
+    img = img.permute(2, 0, 1) / 255.  # img.shape[0] is the color channel after permute
+
+    # Debugging
+    if debug:
+        plt.imshow(np.asarray(img).transpose((1, 2, 0)))
+        plt.imshow(np.asarray(mask).squeeze(), alpha=0.3)
+        plt.show()
+
+    # Images are in the format 3xHxW
+    # and scaled to 0-1 range
+    return {data_key: img, target_key: mask}
+
+
+def parse_color(root, entry, transform, data_key, target_key, debug=False):
     # Image and mask generation
     img = cv2.imread(str(entry.fname))
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -185,34 +217,11 @@ def parse_color_im(root, entry, transform, data_key, target_key):
     img, mask = transform((img, mask))
     img = img.permute(2, 0, 1) / 255.  # img.shape[0] is the color channel after permute
 
-    # Images are in the format 3xHxW
-    # and scaled to 0-1 range
-    return {data_key: img, target_key: mask}
-
-
-def parse_grayscale(root, entry, transform, data_key, target_key):
-    # Image and mask generation
-    img = cv2.imread(str(entry.fname))
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img[:, :, 1] = img[:, :, 0]
-    img[:, :, 2] = img[:, :, 0]
-    try:
-        mask = cv2.imread(str(entry.mask_fname), 0) / 255.
-    except TypeError:
-        raise Exception(str(entry.mask_fname))
-
-    if img.shape[0] != mask.shape[0]:
-        img = cv2.resize(img, (mask.shape[1], mask.shape[0]))
-    elif img.shape[1] != mask.shape[1]:
-        mask = mask[:, :img.shape[1]]
-
-    img, mask = transform((img, mask))
-    img = img.permute(2, 0, 1) / 255.  # img.shape[0] is the color channel after permute
-
     # Debugging
-    #plt.imshow(np.asarray(img).transpose((1, 2, 0)))
-    #plt.imshow(np.asarray(mask).squeeze(), alpha=0.3)
-    #plt.show()
+    if debug:
+        plt.imshow(np.asarray(img).transpose((1, 2, 0)))
+        plt.imshow(np.asarray(mask).squeeze(), alpha=0.3)
+        plt.show()
 
     # Images are in the format 3xHxW
     # and scaled to 0-1 range

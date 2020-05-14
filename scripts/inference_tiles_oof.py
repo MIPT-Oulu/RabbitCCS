@@ -14,7 +14,6 @@ from tqdm import tqdm
 from glob import glob
 
 from collagen.core.utils import auto_detect_device
-from rabbitccs.data.utilities import load_images as load, save_images as save, bounding_box, largest_object
 from rabbitccs.inference.model_components import InferenceModel, load_models
 from rabbitccs.inference.pipeline_components import inference, largest_object
 

@@ -5,6 +5,7 @@ from copy import deepcopy
 import gc
 import cv2
 import segmentation_models_pytorch as smp
+from functools import partial
 
 from collagen.modelzoo.segmentation import EncoderDecoder
 from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
@@ -12,7 +13,7 @@ from collagen.strategies import Strategy
 
 
 from rabbitccs.training.session import create_data_provider, init_experiment, init_callbacks, save_transforms,\
-    init_loss, parse_grayscale, parse_color_im
+    init_loss, parse_grayscale, parse_color
 
 from rabbitccs.data.splits import build_splits
 from rabbitccs.inference.pipeline_components import inference_runner_oof, evaluation_runner
@@ -31,20 +32,25 @@ if __name__ == "__main__":
     for experiment in range(len(config_list)):
         # Current experiment
         start_exp = time()
-        args = deepcopy(args_base)
+        args = deepcopy(args_base)  # Copy args so that they can be updated
         config = config_list[experiment]
 
         # Update arguments according to the configuration file
         if config['training']['experiment'] == '3D':
             args.data_location = args.data_location / 'µCT'
+            parser = parse_grayscale
         elif config['training']['experiment'] == '2D_large':
             args.data_location = args.data_location / 'human'
+            parser = parse_color
+        else:
+            parser = parse_color
 
         # Loss
         loss_criterion = init_loss(config, device=device)
 
         # Split training folds
-        splits_metadata = build_splits(args.data_location, args, config, parse_grayscale,
+        parser_debug = partial(parser, debug=True)  # Display figures
+        splits_metadata = build_splits(args.data_location, args, config, parser_debug,
                                        args.snapshots_dir, config['training']['snapshot'])
         mean, std = splits_metadata['mean'], splits_metadata['std']
 
@@ -55,7 +61,7 @@ if __name__ == "__main__":
         for fold in range(config['training']['n_folds']):
             print(f'\nTraining fold {fold}')
             # Initialize data provider
-            data_provider = create_data_provider(args, config, parse_grayscale, metadata=splits_metadata[f'fold_{fold}'],
+            data_provider = create_data_provider(args, config, parser, metadata=splits_metadata[f'fold_{fold}'],
                                                  mean=mean, std=std)
             # Initialize model model
             backbone = config['model']['backbone']

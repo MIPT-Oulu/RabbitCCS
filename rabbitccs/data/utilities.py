@@ -206,34 +206,6 @@ def bounding_box(image, largest=True):
         return cv2.boundingRect(c), contours
 
 
-def mask2rle(img, width, height):
-    rle = []
-    last_color = 0
-    current_pixel = 0
-    run_start = -1
-    run_length = 0
-
-    for x in range(width):
-        for y in range(height):
-            current_color = img[x][y]
-            if current_color != last_color:
-                if current_color == 255:
-                    run_start = current_pixel
-                    run_length = 1
-                else:
-                    rle.append(str(run_start))
-                    rle.append(str(run_length))
-                    run_start = -1
-                    run_length = 0
-                    current_pixel = 0
-            elif run_start > -1:
-                run_length += 1
-            last_color = current_color
-            current_pixel += 1
-
-    return " ".join(rle)
-
-
 def print_orthogonal(data, mask=None, invert=True, res=3.2, title=None, cbar=True, cmap='gray', savepath=None, scale_factor=1000):
     """Print three orthogonal planes from given 3D-numpy array.
 
@@ -425,29 +397,3 @@ def print_images(images, masks=None, title=None, subtitles=None, save_path=None,
         plt.close(fig)
     else:
         plt.show()
-
-
-def largest_object(mask):
-    """
-    Keeps only the largest connected component of a binary segmentation mask.
-    """
-
-    out_img = np.zeros(mask.shape, dtype=np.uint8)
-
-
-    binary_img = mask > 0
-    blobs = measure.label(binary_img, connectivity=1)
-
-    props = measure.regionprops(blobs)
-
-    if not props:
-        print('No mask detected! Returning empty array')
-        return out_img
-
-    area = [ele.area for ele in props]
-    largest_blob_ind = np.argmax(area)
-    largest_blob_label = props[largest_blob_ind].label
-
-    out_img[blobs == largest_blob_label] = 255
-
-    return out_img

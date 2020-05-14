@@ -82,73 +82,79 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
     prob = trf['transform_probability']
     # Training transforms
     if trf['experiment'] == '3D':
-        train_transforms = [
-            slt.RandomProjection(
-                slc.Stream([
-                    slt.RandomRotate(rotation_range=tuple(trf['rotation_range']), p=prob),
-                    slt.RandomScale(range_x=tuple(trf['scale_range']),
-                                    range_y=tuple(trf['scale_range']), same=False, p=prob),
-                    slt.RandomShear(range_x=tuple(trf['shear_range']),
-                                    range_y=tuple(trf['shear_range']), p=prob),
-                    slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
-                ]),
-                v_range=tuple(trf['v_range'])),
-            # Spatial
-            slt.RandomFlip(p=prob),
-            slt.PadTransform(pad_to=crop_size),
-            slt.CropTransform(crop_mode='r', crop_size=crop_size),
-            # Intensity
+        train_transforms = [slc.SelectiveStream([
+            slc.Stream([
+                slt.RandomProjection(
+                    slc.Stream([
+                        slt.RandomRotate(rotation_range=tuple(trf['rotation_range']), p=prob),
+                        slt.RandomScale(range_x=tuple(trf['scale_range']),
+                                        range_y=tuple(trf['scale_range']), same=False, p=prob),
+                        slt.RandomShear(range_x=tuple(trf['shear_range']),
+                                        range_y=tuple(trf['shear_range']), p=prob),
+                        slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
+                    ]),
+                    v_range=tuple(trf['v_range'])),
+                # Spatial
+                slt.RandomFlip(p=prob),
+                slt.PadTransform(pad_to=crop_size),
+                slt.CropTransform(crop_mode='r', crop_size=crop_size),
 
-            #slt.ImageGammaCorrection(gamma_range=tuple(trf['gamma_range']), p=prob),
-            #slt.ImageRandomHSV(h_range=tuple(trf['hsv_range']),
-            #                   s_range=tuple(trf['hsv_range']),
-            #                   v_range=tuple(trf['hsv_range']), p=prob),
-            # Brightness/contrast
-            slc.SelectiveStream([
-                slt.ImageRandomBrightness(brightness_range=tuple(trf['brightness_range']), p=prob),
-                slt.ImageRandomContrast(contrast_range=trf['contrast_range'], p=prob)]),
-            # Noise
-            slc.SelectiveStream([
-                slt.ImageSaltAndPepper(p=prob, gain_range=trf['gain_range_sp']),
-                slt.ImageAdditiveGaussianNoise(p=prob, gain_range=trf['gain_range_gn']),
+                # Intensity
+                # Brightness/contrast
                 slc.SelectiveStream([
-                    slt.ImageBlur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
-                    slt.ImageBlur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])
+                    slt.ImageRandomBrightness(brightness_range=tuple(trf['brightness_range']), p=prob),
+                    slt.ImageRandomContrast(contrast_range=trf['contrast_range'], p=prob)]),
+                # Noise
+                slc.SelectiveStream([
+                    slt.ImageSaltAndPepper(p=prob, gain_range=trf['gain_range_sp']),
+                    slt.ImageAdditiveGaussianNoise(p=prob, gain_range=trf['gain_range_gn']),
+                    slc.SelectiveStream([
+                        slt.ImageBlur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
+                        slt.ImageBlur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])]),
+
+            # Empty stream
+            slc.Stream([
+                slt.PadTransform(pad_to=crop_size),
+                slt.CropTransform(crop_mode='r', crop_size=crop_size)])])
         ]
     else:
-        train_transforms = [
-            # Projection
-            slt.RandomProjection(
-                slc.Stream([
-                    slt.RandomRotate(rotation_range=tuple(trf['rotation_range']), p=prob),
-                    slt.RandomScale(range_x=tuple(trf['scale_range']),
-                                    range_y=tuple(trf['scale_range']), same=False, p=prob),
-                    #slt.RandomShear(range_x=tuple(trf['shear_range']),
-                    #                range_y=tuple(trf['shear_range']), p=prob),
-                    #slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
-                ]),
-                v_range=tuple(trf['v_range'])),
-            # Spatial
-            slt.RandomFlip(p=prob),
-            slt.PadTransform(pad_to=crop_size[1]),
-            slt.CropTransform(crop_mode='r', crop_size=crop_size),
-            # Intensity
-            # Add an empty stream
-            #slc.SelectiveStream([]),
-            slc.SelectiveStream([
-                slt.ImageGammaCorrection(gamma_range=tuple(trf['gamma_range']), p=prob),
-                slt.ImageRandomHSV(h_range=tuple(trf['hsv_range']),
-                                   s_range=tuple(trf['hsv_range']),
-                                   v_range=tuple(trf['hsv_range']), p=prob)]),
-            slc.SelectiveStream([
-                slt.ImageRandomBrightness(brightness_range=tuple(trf['brightness_range']), p=prob),
-                slt.ImageRandomContrast(contrast_range=trf['contrast_range'], p=prob)]),
-            slc.SelectiveStream([
-                slt.ImageSaltAndPepper(p=prob, gain_range=trf['gain_range_sp']),
-                slt.ImageAdditiveGaussianNoise(p=prob, gain_range=trf['gain_range_gn']),
+        train_transforms = [slc.SelectiveStream([
+            slc.Stream([
+                # Projection
+                slt.RandomProjection(
+                    slc.Stream([
+                        slt.RandomRotate(rotation_range=tuple(trf['rotation_range']), p=prob),
+                        slt.RandomScale(range_x=tuple(trf['scale_range']),
+                                        range_y=tuple(trf['scale_range']), same=False, p=prob),
+                        #slt.RandomShear(range_x=tuple(trf['shear_range']),
+                        #                range_y=tuple(trf['shear_range']), p=prob),
+                        #slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
+                    ]),
+                    v_range=tuple(trf['v_range'])),
+                # Spatial
+                slt.RandomFlip(p=prob),
+                slt.PadTransform(pad_to=crop_size),
+                slt.CropTransform(crop_mode='r', crop_size=crop_size),
+                # Intensity
                 slc.SelectiveStream([
-                    slt.ImageBlur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
-                    slt.ImageBlur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])
+                    slt.ImageGammaCorrection(gamma_range=tuple(trf['gamma_range']), p=prob),
+                    slt.ImageRandomHSV(h_range=tuple(trf['hsv_range']),
+                                       s_range=tuple(trf['hsv_range']),
+                                       v_range=tuple(trf['hsv_range']), p=prob)]),
+                slc.SelectiveStream([
+                    slt.ImageRandomBrightness(brightness_range=tuple(trf['brightness_range']), p=prob),
+                    slt.ImageRandomContrast(contrast_range=trf['contrast_range'], p=prob)]),
+                slc.SelectiveStream([
+                    slt.ImageSaltAndPepper(p=prob, gain_range=trf['gain_range_sp']),
+                    slt.ImageAdditiveGaussianNoise(p=prob, gain_range=trf['gain_range_gn']),
+                    slc.SelectiveStream([
+                        slt.ImageBlur(p=prob, blur_type='g', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma'])),
+                        slt.ImageBlur(p=prob, blur_type='m', k_size=(3, 7, 11), gaussian_sigma=tuple(trf['sigma']))])])]),
+
+            # Empty stream
+            slc.Stream([
+                slt.PadTransform(pad_to=crop_size),
+                slt.CropTransform(crop_mode='r', crop_size=crop_size)])])
         ]
 
     train_trf = [
