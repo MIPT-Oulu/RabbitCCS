@@ -7,6 +7,9 @@ from collagen.modelzoo.segmentation import EncoderDecoder
 
 
 class InferenceModel(nn.Module):
+    """
+    Class that compiles the trained segmentation models for inference and calculates average prediction across folds.
+    """
     def __init__(self, models_list):
         super(InferenceModel, self).__init__()
         self.n_folds = len(models_list)
@@ -26,6 +29,9 @@ class InferenceModel(nn.Module):
 
 
 def load_models(model_path, config, n_gpus=1, unet=True):
+    """
+    Loads segmentation models with a given architecture.
+    """
     # Load models
     models = glob(model_path + '/*fold_*.pth')
     models.sort()

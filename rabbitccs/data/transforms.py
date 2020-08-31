@@ -69,18 +69,39 @@ def numpy2tens(x: np.ndarray, dtype='f') -> torch.Tensor:
 
 
 def wrap_solt(entry):
+    """
+    Converts the image into Solt format
+    :param entry: Input image
+    :return: Image in Solt format
+    """
     return sld.DataContainer(entry, 'IM', transform_settings={0: {'interpolation': 'bilinear'},
                                                               1: {'interpolation': 'nearest'}})
 
 
 def unwrap_solt(dc):
+    """
+    Extracts the augmented image from Solt format.
+    :param dc: Solt datacontainer
+    :return: Augmented image data
+    """
     return dc.data
 
 
 def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
+    """
+    Compiles the different image augmentations that are used for input images.
+
+    :param conf: Transformation parameters
+    :param mean: Dataset image mean
+    :param std: Dataset image std
+    :param crop_size: Image size for the segmentation model
+    :return: Compiled transformation objects, and lists of the used transforms
+    """
     trf = conf['training']
     prob = trf['transform_probability']
     # Training transforms
+
+    # 3D transforms
     if trf['experiment'] == '3D':
         train_transforms = [slc.SelectiveStream([
             slc.Stream([
@@ -117,6 +138,8 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
                 slt.PadTransform(pad_to=crop_size),
                 slt.CropTransform(crop_mode='r', crop_size=crop_size)])])
         ]
+
+    # 2D transforms
     else:
         train_transforms = [slc.SelectiveStream([
             slc.Stream([
@@ -126,9 +149,9 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
                         slt.RandomRotate(rotation_range=tuple(trf['rotation_range']), p=prob),
                         slt.RandomScale(range_x=tuple(trf['scale_range']),
                                         range_y=tuple(trf['scale_range']), same=False, p=prob),
-                        #slt.RandomShear(range_x=tuple(trf['shear_range']),
+                        # slt.RandomShear(range_x=tuple(trf['shear_range']),
                         #                range_y=tuple(trf['shear_range']), p=prob),
-                        #slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
+                        slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
                     ]),
                     v_range=tuple(trf['v_range'])),
                 # Spatial
@@ -157,12 +180,18 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
                 slt.CropTransform(crop_mode='r', crop_size=crop_size)])])
         ]
 
+    # Compile training transforms
     train_trf = [
+        # Move to SOLT format
         wrap_solt,
+        # Transforms
         slc.Stream(train_transforms),
+        # Extract image
         unwrap_solt,
+        # Move to tensor
         ApplyTransform(numpy2tens, (0, 1, 2))
     ]
+
     # Validation transforms
     val_trf = [
         wrap_solt,
@@ -173,13 +202,14 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
         unwrap_solt,
         ApplyTransform(numpy2tens, idx=(0, 1, 2))
     ]
+
     # Test transforms
     test_trf = [
         unwrap_solt,
         ApplyTransform(numpy2tens, idx=(0, 1, 2))
     ]
 
-    # Use normalize_channel_wise if mean and std not calculated
+    # Normalize train and val images if mean and std are given
     if mean is not None and std is not None:
         train_trf.append(ApplyTransform(partial(normalize_channel_wise, mean=mean, std=std)))
 

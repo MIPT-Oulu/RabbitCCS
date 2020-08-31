@@ -8,7 +8,7 @@ from copy import deepcopy
 if __name__ == '__main__':
     # Set up file paths
     #path = Path('/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Manual vs auto/thickness_median12_predicted')
-    path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Manual vs auto/thickness_median12_manual')
+    path = Path('../../../Data/µCT/predictions/dios-erc-gpu_2020_04_03_07_25_01_FPN_resnet18_oof_thickness_median12_manual')
     average = True
 
     result_path = glob(str(path) + '/*Results*.xlsx')

@@ -16,10 +16,12 @@ def load_images(path, n_jobs=12, rgb=False, uCT=False):
     ----------
     path : str
         Path to image stack.
-    axis : tuple
-        Order of loaded sample axes.
     n_jobs : int
         Number of parallel workers. Check N of CPU cores.
+    rgb : bool
+        Load grayscale or color images.
+    uCT : bool
+        Load only specific images in µCT datasets (that include a projection number in file name).
     Returns
     -------
     Loaded stack of images as 3D numpy array.
@@ -52,7 +54,7 @@ def load_images(path, n_jobs=12, rgb=False, uCT=False):
         return files, data
     else:
         data = Parallel(n_jobs=n_jobs)(delayed(read_image_gray)(path, file) for file in tqdm(files, 'Loading'))
-        return files, data
+        return files, np.array(data)
 
 
 def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
@@ -95,16 +97,18 @@ def load(path, axis=(0, 1, 2), n_jobs=12, rgb=False):
     return np.array(data), files
 
 
-def read_image_gray(path, file):
+def read_image_gray(path, file, original_format=False):
     """Reads image from given path."""
     # Image
     f = os.path.join(path, file)
-    image = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
-    return image
+    if original_format:
+        return cv2.imread(f, -1)
+    else:
+        return cv2.imread(f, cv2.IMREAD_GRAYSCALE)
 
 
 def read_image_rgb(path, file):
-    """Reads image from given path."""
+    """Reads color image from given path."""
     # Image
     f = os.path.join(path, file)
     image = cv2.imread(f, cv2.IMREAD_COLOR)
@@ -114,7 +118,7 @@ def read_image_rgb(path, file):
 
 def save(path, file_name, data, n_jobs=12, dtype='.png'):
     """
-    Save a volumetric 3D dataset in given directory.
+    Save a volumetric 3D dataset in a given directory.
 
     Parameters
     ----------

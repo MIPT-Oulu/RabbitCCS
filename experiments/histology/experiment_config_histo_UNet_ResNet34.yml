@@ -4,11 +4,10 @@ training:
   calc_meanstd: True
   parse_color: False
   crop_size: [512, 1024]
-  threshold: 0.3
   # Training
   wd: 0.0001
   lr: 0.0001
-  n_folds: 5
+  n_folds: 4
   epochs: 100
   bs: 12
   # Loss parameters: possible losses are "bce", "jaccard" and "combined"

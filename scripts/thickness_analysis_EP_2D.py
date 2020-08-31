@@ -17,12 +17,13 @@ from rabbitccs.inference.thickness_analysis import _local_thickness
 
 if __name__ == '__main__':
     start = time()
-    # base_path = Path('../../../Data/µCT')
-    base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Manual vs auto')
+    base_path = Path('../../../Data/µCT/predictions')
+    sample = 'dios-erc-gpu_2020_04_03_07_25_01_FPN_resnet18_oof'
+    #base_path = Path('/media/dios/dios2/RabbitSegmentation/µCT/Matched µCT')
     filter_size = 12
     parser = argparse.ArgumentParser()
-    parser.add_argument('--masks', type=Path, default=base_path / 'masks')
-    parser.add_argument('--th_maps', type=Path, default=base_path / f'thickness_median{filter_size}_manual')
+    parser.add_argument('--masks', type=Path, default=base_path / sample)
+    parser.add_argument('--th_maps', type=Path, default=base_path / (sample + f'_thickness_median{filter_size}_manual'))
     parser.add_argument('--plot', type=bool, default=True)
     parser.add_argument('--save_h5', type=bool, default=False)
     parser.add_argument('--batch_id', type=int, default=None)
@@ -43,7 +44,8 @@ if __name__ == '__main__':
     # Save paths
     args.th_maps.mkdir(exist_ok=True)
     (args.th_maps / 'visualization').mkdir(exist_ok=True)
-    (args.th_maps / 'h5').mkdir(exist_ok=True)
+    if args.save_h5:
+        (args.th_maps / 'h5').mkdir(exist_ok=True)
 
     results = {'Sample': [], 'Mean thickness': [], 'Median thickness': [], 'Thickness STD': [], 'Maximum thickness': []}
     t = strftime(f'%Y_%m_%d_%H_%M')

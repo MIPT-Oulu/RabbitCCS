@@ -9,10 +9,10 @@ import pathlib
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset_root', type=pathlib.Path,
                     #default='/media/dios/dios2/RabbitSegmentation/µCT/images_test/8C_M1_lateral_condyle_XZ')
-                    default='/media/dios/dios2/RabbitSegmentation/Manual segmentation/image')
+                    default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL')
 parser.add_argument('--mask_dir', type=pathlib.Path,
                     #default='/media/dios/dios2/RabbitSegmentation/µCT/predictions_4fold/8C_M1_lateral_condyle_XZ/Largest')
-                    default='/media/dios/dios2/RabbitSegmentation/Manual segmentation/mask')
+                    default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_CTRL')
 parser.add_argument('--crop', type=bool, default=False)
 parser.add_argument('--crop_method', type=str, default='bbox')
 parser.add_argument('--saved', type=bool, default=True)
@@ -23,7 +23,6 @@ args = parser.parse_args()
 # Load and set paths
 im_files, data = load(args.dataset_root, rgb=True, uCT=False)
 mask_files, mask = load(args.mask_dir, rgb=False, uCT=False)
-
 
 # Expand mask to 3 channels
 # mask_large = np.zeros((mask.shape[0], mask.shape[1], 3, mask.shape[2]))
@@ -69,7 +68,7 @@ elif args.crop_method == 'value':
 # Save images
 if args.saved:
     #save_im = '/media/dios/dios2/HistologySegmentation/Images_cropped2'
-    save_im_ref = '/media/dios/dios2/RabbitSegmentation/Manual segmentation/Contour'
+    save_im_ref = '/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_contour'
     #save_mask = '/media/dios/dios2/HistologySegmentation/Masks_cropped2'
     save_im = str(args.dataset_root / 'crop')
     save_mask = str(args.mask_dir / 'crop')

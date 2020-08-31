@@ -42,7 +42,9 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
 
     # Run predictions for tiles and accumulate them
     for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops)), batch_size=config['training']['bs'], pin_memory=True):
+
         # Move tile to GPU
+        # Normalize image
         if mean is not None and std is not None:
             tiles_batch = tiles_batch.float()
             for ch in range(len(mean)):
@@ -50,13 +52,14 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
             tiles_batch = tiles_batch.to(device)
         else:
             tiles_batch = (tiles_batch.float() / 255.).to(device)
-        # Predict and move back to CPU
+
+        # Predict the mask
         pred_batch = inference_model(tiles_batch)
 
         # Merge on GPU
         merger.integrate_batch(pred_batch, coords_batch)
 
-        # Plot
+        # Plot result tile
         if plot:
             for i in range(args.bs):
                 if args.bs != 1:
@@ -68,7 +71,7 @@ def inference(inference_model, args, config, img_full, device='cuda', weight='me
     # Normalize accumulated mask and convert back to numpy
     merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype('float32')
     merged_mask = tiler.crop_to_orignal_size(merged_mask)
-    # Plot
+    # Plot result
     if plot:
         for i in range(args.bs):
             if args.bs != 1:
@@ -166,6 +169,13 @@ def inference_runner_oof(args, config, split_config, device, plot=False, weight=
 
 
 def evaluation_runner(args, config, save_dir):
+    """
+    Calculates evaluation metrics on predicted masks against target.
+    :param args:
+    :param config:
+    :param save_dir:
+    :return:
+    """
     start_eval = time()
 
     # Evaluation arguments

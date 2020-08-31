@@ -8,9 +8,54 @@ from tqdm import tqdm
 import argparse
 import pandas as pd
 from time import time
+from rabbitccs.data.utilities import load_images as load, save_images as save, bounding_box, print_orthogonal
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
+
+
+def map_uint16_to_uint8(img, lower_bound=None, upper_bound=None):
+    """
+    Map a 16-bit image trough a lookup table to convert it to 8-bit.
+
+    Parameters
+    ----------
+    img: numpy.ndarray[np.uint16]
+        image that should be mapped
+    lower_bound: int, optional
+        lower bound of the range that should be mapped to ``[0, 255]``,
+        value must be in the range ``[0, 65535]`` and smaller than `upper_bound`
+        (defaults to ``numpy.min(img)``)
+    upper_bound: int, optional
+       upper bound of the range that should be mapped to ``[0, 255]``,
+       value must be in the range ``[0, 65535]`` and larger than `lower_bound`
+       (defaults to ``numpy.max(img)``)
+
+    Returns
+    -------
+    numpy.ndarray[uint8]
+    """
+    # Check for errors
+    if not(0 <= lower_bound < 2**16) and lower_bound is not None:
+        raise ValueError('"lower_bound" must be in the range [0, 65535]')
+    elif not(0 <= upper_bound < 2**16) and upper_bound is not None:
+        raise ValueError('"upper_bound" must be in the range [0, 65535]')
+    elif lower_bound >= upper_bound:
+        raise ValueError('"lower_bound" must be smaller than "upper_bound"')
+
+    # Automatic scaling if not given
+    if lower_bound is None:
+        lower_bound = np.min(img)
+    if upper_bound is None:
+        upper_bound = np.max(img)
+
+    # Create lookup that maps 16-bit to 8-bit values
+    lut = np.concatenate([
+        np.zeros(lower_bound, dtype=np.uint16),
+        np.linspace(0, 255, upper_bound - lower_bound).astype(np.uint16),
+        np.ones(2**16 - upper_bound, dtype=np.uint16) * 255
+    ])
+    return lut[img].astype(np.uint8)
 
 
 if __name__ == "__main__":
@@ -19,7 +64,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--mask_path', type=Path, default='../../../Data/masks')
-    parser.add_argument('--save_dir', type=Path, default='../../../Data/masks_smoothed')
+    parser.add_argument('--data_path', type=Path, default='/media/dios/dios2/3DHistoData/HMDS_data')
+    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/3DHistoData/HMDS_scaled')
     parser.add_argument('--k_closing', type=tuple, default=(13, 13))
     parser.add_argument('--k_gauss', type=tuple, default=(9, 9))
     parser.add_argument('--k_median', type=int, default=7)
@@ -30,12 +76,15 @@ if __name__ == "__main__":
 
     # Loop for samples
     args.save_dir.mkdir(exist_ok=True)
-    #samples = os.listdir(str(args.mask_path))
-    samples = [os.path.basename(x) for x in glob(str(args.mask_path / '*.png'))]
+    samples = os.listdir(str(args.data_path))
+    #samples = [os.path.basename(x) for x in glob(str(args.mask_path / '*.png'))]
     samples.sort()
     for sample in tqdm(samples, 'Smoothing'):
         #try:
         # Load image
+        _, data = load(str(args.data_path / sample), uCT=True)
+        data_scaled = map_uint16_to_uint8(data, lower_bound=0, upper_bound=40000)
+        print_orthogonal(data_scaled)
         img = cv2.imread(str(args.mask_path / sample), cv2.IMREAD_GRAYSCALE)
         if args.plot:
             plt.imshow(img); plt.title('Loaded image'); plt.show()

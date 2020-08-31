@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     snaps = [#'dios-erc-gpu_2020_04_02_08_42_39_Unet_resnet18',
              #'dios-erc-gpu_2020_04_02_11_18_28_Unet_resnet34',
-              'dios-erc-gpu_2020_04_02_14_24_27_FPN_resnet34',
+              'dios-erc-gpu_2020_05_19_15_54_41_3D_resnet34_UNet',
               'dios-erc-gpu_2020_04_03_07_25_01_FPN_resnet18']
     """
     snaps = ['dios-erc-gpu_2020_04_23_13_58_05_2D_resnet34_UNet',

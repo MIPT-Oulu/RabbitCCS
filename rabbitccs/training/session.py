@@ -28,14 +28,31 @@ from rabbitccs.data.transforms import train_test_transforms
 
 
 def init_experiment():
+    """
+    Setup the model training experiments.
+    Lists all configuration files in the args.experiment directory and runs experiments with the given parameters.
+
+    :return: General arguments, experiment parameters, computation device (CPU/GPU)
+    """
+
     # Input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_location', type=pathlib.Path, default='../../../Data')
-    parser.add_argument('--workdir', type=pathlib.Path, default='../../../workdir/')
-    parser.add_argument('--experiment', type=pathlib.Path, default='../experiments/run')
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--num_threads', type=int, default=16)
-    parser.add_argument('--gpus', type=int, default=2)
+    parser.add_argument('--data_location', type=pathlib.Path, default='../../../Data',
+                        help='Path to input and target images')
+    parser.add_argument('--workdir', type=pathlib.Path, default='../../../workdir/',
+                        help='Path for saving the experiment logs and segmentation models')
+    parser.add_argument('--experiment', type=pathlib.Path, default='../experiments/run',
+                        help='Path to experiment files for training (all experiments are conducted)')
+    parser.add_argument('--ID_char', type=str, default='_',
+                        help='Separator for the subject ID and image name')
+    parser.add_argument('--ID_split', type=int, default=4,
+                        help='Count of the ID_char to split the subject ID')
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Random seed to allow consistent experiments (e.g. for random augmentations)')
+    parser.add_argument('--num_threads', type=int, default=16,
+                        help='Number of CPUs for parallel processing')
+    parser.add_argument('--gpus', type=int, default=2,
+                        help='Number of GPUs for model training')
     args = parser.parse_args()
 
     # Initialize working directories
@@ -81,13 +98,28 @@ def init_experiment():
 
 
 def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimizer, data_provider, mean, std):
+    """
+    Initializes the Collagen callbacks for logging the training and saving models.
+
+    :param fold_id: Number of train/validation fold
+    :param config: Experiment configuration
+    :param snapshots_dir: Path for saved experiment results (model and logs)
+    :param snapshot_name: Name for the experiment
+    :param model: Model that is trained
+    :param optimizer: Parameter optimizer (e.g. Adam, SGD)
+    :param data_provider: Collagen dataloader
+    :param mean: Dataset mean
+    :param std: Dataset std
+    :return: List of training and validation callbacks
+    """
+
     # Snapshot directory
     current_snapshot_dir = snapshots_dir / snapshot_name
     crop = config['training']['crop_size']
     log_dir = current_snapshot_dir / f"fold_{fold_id}_log"
     device = next(model.parameters()).device
 
-    # Tensorboard
+    # Tensorboard writer
     writer = SummaryWriter(comment='RabbitCCS', log_dir=log_dir, flush_secs=15, max_queue=1)
     prefix = f"{crop[0]}x{crop[1]}_fold_{fold_id}"
 
@@ -97,7 +129,7 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
     else:  # Not given
         threshold = 0.3 if config['training']['log_jaccard'] else 0.5
 
-    # Callbacks
+    # Callbacks for training and validation phase
     train_cbs = (RunningAverageMeter(prefix="train", name="loss"),
                  ScalarMeterLogger(writer, comment='training', log_dir=str(log_dir))
                  )
@@ -125,6 +157,12 @@ def init_callbacks(fold_id, config, snapshots_dir, snapshot_name, model, optimiz
 
 
 def init_loss(config, device='cuda'):
+    """
+    Set up the loss function.
+    :param config: Experiment congiguration
+    :param device: Computation device (CPU/GPU)
+    :return: Selected loss function.
+    """
     loss = config['training']['loss']
     if loss == 'bce':
         return BCEWithLogitsLoss2d().to(device)
@@ -140,6 +178,16 @@ def init_loss(config, device='cuda'):
 
 
 def create_data_provider(args, config, parser, metadata, mean, std):
+    """
+    Setup dataloader and augmentations
+    :param args: General arguments
+    :param config: Experiment parameters
+    :param parser: Function for loading images
+    :param metadata: Image paths and subject IDs
+    :param mean: Dataset mean
+    :param std: Dataset std
+    :return: The compiled dataloader
+    """
     # Compile ItemLoaders
     item_loaders = dict()
     for stage in ['train', 'val']:
@@ -153,30 +201,10 @@ def create_data_provider(args, config, parser, metadata, mean, std):
     return DataProvider(item_loaders)
 
 
-def parse_multi_label(x, cls, threshold=0.5):
-    out = x[:, cls, :, :].unsqueeze(1).gt(threshold)
-    return torch.cat((1 - out, out), dim=1).squeeze()
-
-
-def parse_binary_label(x, threshold=0.5):
-    out = x.gt(threshold)
-    #return torch.cat((~out, out), dim=1).squeeze().float()
-    return out.squeeze().float()
-
-
-def parse_item_test(root, entry, transform, data_key, target_key):
-    img = cv2.imread(str(entry.fname), 0)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    dc = sld.DataContainer((img, ), 'I',  transform_settings={0: {'interpolation': 'bilinear'}})
-    img = transform(dc)[0]
-    #img = torch.cat([img, img, img], 0) / 255.
-    img = img.permute(2, 0, 1) / 255.
-
-    return {data_key: img}
-
-
 def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
+    """
+    Loader function for grayscale images.
+    """
     # Image and mask generation
     img = cv2.imread(str(entry.fname))
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -190,12 +218,12 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
         mask = mask[:, :img.shape[1]]
 
     img, mask = transform((img, mask))
-    img = img.permute(2, 0, 1) / 255.  # img.shape[0] is the color channel after permute
+    img = img.permute(2, 0, 1)  # img.shape[0] is the color channel after permute
 
     # Debugging
     if debug:
         plt.imshow(np.asarray(img).transpose((1, 2, 0)))
-        plt.imshow(np.asarray(mask).squeeze(), alpha=0.3)
+        plt.imshow(np.ma.masked_array(mask * 255, mask == 0).squeeze(), cmap='autumn', alpha=0.3)
         plt.show()
 
     # Images are in the format 3xHxW
@@ -204,6 +232,9 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
 
 
 def parse_color(root, entry, transform, data_key, target_key, debug=False):
+    """
+    Loader function for color images.
+    """
     # Image and mask generation
     img = cv2.imread(str(entry.fname))
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -246,6 +277,9 @@ def save_config(path, config, args):
 
 
 def save_transforms(path, config, args, mean, std):
+    """
+    Function to save the used augmentations.
+    """
     transforms = train_test_transforms(config, mean, std, crop_size=tuple(config['training']['crop_size']))
     # Save the experiment parameters
     with open(path / 'transforms.json', 'w') as f:

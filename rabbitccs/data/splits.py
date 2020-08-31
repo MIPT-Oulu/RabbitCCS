@@ -9,6 +9,14 @@ from rabbitccs.data.transforms import estimate_mean_std
 
 
 def build_meta_from_files(base_path, phase='train'):
+    """
+    Creates a dataframe from the input and target images.
+    For 2D data, base path should lead to "images" and "masks" folders, with the corresponding data inside.
+    For 3D data, one sample should have a separate subfolder inside with the sample name.
+    :param base_path: Path to image and target data
+    :param phase: Train / test
+    :return: Dataframe with the image paths
+    """
     if phase == 'train':
         masks_loc = base_path / 'masks'
         images_loc = base_path / 'images'
@@ -46,10 +54,24 @@ def build_meta_from_files(base_path, phase='train'):
 
 
 def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
+    """
+    Splits the images from the given directory into training and validation folds.
+
+    IMPORTANT! Check that the subject ID is set up correctly (args.ID_split),
+    i.e. at which point the file name separates the ID and image name.
+
+    :param data_dir: Path to input and target data
+    :param args: Experiment arguments
+    :param config: Configuration file (more arguments)
+    :param parser: Function that loads the images
+    :param snapshots_dir: Path to experiment logs and models
+    :param snapshot_name: Name of the experiment
+    :return: Metadata including the training and validation splits, as well as mean and std
+    """
     # Metadata
     metadata = build_meta_from_files(data_dir)
     # Group_ID
-    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split('_', 4)[:-1]), 0)
+    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split(args.ID_char, args.ID_split)[:-1]), 0)
 
     # Mean and std
     crop = config['training']['crop_size']
@@ -68,12 +90,12 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
 
     # Group K-Fold by rabbit ID
     gkf = model_selection.GroupKFold(n_splits=config['training']['n_folds'])
-    # K-fold by random shuffle
-    #gkf = model_selection.KFold(n_splits=config['training']['n_folds'], shuffle=True, random_state=args.seed)
+    # K-fold by random shuffle (not recommended if ID is known)
+    # gkf = model_selection.KFold(n_splits=config['training']['n_folds'], shuffle=True, random_state=args.seed)
 
     # Create splits for all folds
     splits_metadata = dict()
-    iterator = gkf.split(metadata.fname.values, groups=metadata.subj_id.values)
+    iterator = gkf.split(metadata.fname.values, groups=metadata.subj_id.values)  # Split by subject ID
     for fold in range(config['training']['n_folds']):
         train_idx, val_idx = next(iterator)
         splits_metadata[f'fold_{fold}'] = {'train': metadata.iloc[train_idx],
@@ -83,6 +105,7 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     splits_metadata['mean'] = mean
     splits_metadata['std'] = std
 
+    # Save splits, mean and std
     with open(snapshots_dir / snapshot_name / 'split_config.dill', 'wb') as f:
         dill.dump(splits_metadata, f)
 
