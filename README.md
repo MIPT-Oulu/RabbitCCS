@@ -15,7 +15,7 @@ In this paper, we utilized state-of-the-art deep learning segmentation methods t
 ```pip install -r requirements.txt```
 
 ## Usage
-Model training is conducted using ```train.py``` in the ```scripts``` directory. The training codes runs a sequence of experiments, based on the experiment configuration files at the ```run``` directory. Update the configuration files with desired experiment parameters, as well as the general arguments in ```session.py```, ```init_experiment()```.
+Model training is conducted using ```train.py``` in the ```scripts``` directory. The training codes runs a sequence of experiments, based on the experiment configuration files at the ```experiments/run``` directory. Update the configuration files with desired experiment parameters, as well as the general arguments in ```session.py```, ```init_experiment()```.
 
 The out-of-fold inference and metric evaluation can be conducted automatically with the inference parameter set to true.
 
