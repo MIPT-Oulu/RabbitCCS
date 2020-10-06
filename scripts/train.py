@@ -37,11 +37,7 @@ if __name__ == "__main__":
 
         # Update arguments according to the configuration file
         if config['training']['experiment'] == '3D':
-            args.data_location = args.data_location / 'µCT'
             parser = parse_grayscale
-        elif config['training']['experiment'] == '2D_large':
-            args.data_location = args.data_location / 'human'
-            parser = parse_color
         else:
             parser = parse_color
 
@@ -77,7 +73,7 @@ if __name__ == "__main__":
 
             print(f'Encoder: {backbone}, decoder: {decoder}')
 
-                    # Optimizer
+            # Optimizer
             optimizer = optim.Adam(model.parameters(),
                                    lr=config['training']['lr'],
                                    weight_decay=config['training']['wd'])

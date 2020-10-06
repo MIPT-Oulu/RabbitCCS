@@ -110,8 +110,8 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
                         slt.RandomRotate(rotation_range=tuple(trf['rotation_range']), p=prob),
                         slt.RandomScale(range_x=tuple(trf['scale_range']),
                                         range_y=tuple(trf['scale_range']), same=False, p=prob),
-                        slt.RandomShear(range_x=tuple(trf['shear_range']),
-                                        range_y=tuple(trf['shear_range']), p=prob),
+                        #slt.RandomShear(range_x=tuple(trf['shear_range']),
+                        #                range_y=tuple(trf['shear_range']), p=prob),
                         slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
                     ]),
                     v_range=tuple(trf['v_range'])),
@@ -232,20 +232,22 @@ def estimate_mean_std(config, metadata, parse_item_cb, num_threads=8, bs=16):
                                  batch_size=bs, num_workers=num_threads,
                                  shuffle=False)
 
-    mean = None
-    std = None
-    for i in tqdm(range(len(mean_std_loader)), desc='Calculating mean and standard deviation'):
-        for batch in mean_std_loader.sample():
-            if mean is None:
-                mean = torch.zeros(batch['data'].size(1))
-                std = torch.zeros(batch['data'].size(1))
-            # for channel in range(batch['data'].size(1)):
-            #     mean[channel] += batch['data'][:, channel, :, :].mean().item()
-            #     std[channel] += batch['data'][:, channel, :, :].std().item()
-            mean += batch['data'].mean().item()
-            std += batch['data'].std().item()
+    mean = (95.6192, 95.6192, 95.6192)  # None
+    std = (37.8652, 37.8652, 37.8652)  # None
 
-    mean /= len(mean_std_loader)
-    std /= len(mean_std_loader)
+    if mean is None or std is None:
+        for i in tqdm(range(len(mean_std_loader)), desc='Calculating mean and standard deviation'):
+            for batch in mean_std_loader.sample():
+                if mean is None:
+                    mean = torch.zeros(batch['data'].size(1))
+                    std = torch.zeros(batch['data'].size(1))
+                # for channel in range(batch['data'].size(1)):
+                #     mean[channel] += batch['data'][:, channel, :, :].mean().item()
+                #     std[channel] += batch['data'][:, channel, :, :].std().item()
+                mean += batch['data'].mean().item()
+                std += batch['data'].std().item()
+
+        mean /= len(mean_std_loader)
+        std /= len(mean_std_loader)
 
     return mean, std

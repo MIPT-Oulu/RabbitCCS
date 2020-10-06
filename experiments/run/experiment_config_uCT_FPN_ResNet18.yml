@@ -9,7 +9,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 60
-  bs: 12
+  bs: 4
   # Loss parameters: possible losses are "bce", "jaccard" and "combined"
   loss: combined
   log_jaccard: true
@@ -40,8 +40,8 @@ model:
   n_outputs: 1
   spatial_dropout: 0.1
   bayesian_dropout: 0.5
-  backbone: resnet18
-  decoder: FPN
+  backbone: resnet18  # resnet 18, 34, 52, 101
+  decoder: FPN # FPN UNEt
 data_sampling:
   train:
     data_provider:

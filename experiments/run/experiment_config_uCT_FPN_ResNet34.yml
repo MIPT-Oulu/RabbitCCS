@@ -9,7 +9,7 @@ training:
   lr: 0.0001
   n_folds: 4
   epochs: 60
-  bs: 12
+  bs: 4
   # Loss parameters: possible losses are "bce", "jaccard" and "combined"
   loss: combined
   log_jaccard: true

@@ -10,6 +10,8 @@ import torch.nn as nn
 import dill
 import json
 import cv2
+import pickle
+from random import uniform
 import os
 import solt.data as sld
 from tensorboardX import SummaryWriter
@@ -37,20 +39,20 @@ def init_experiment():
 
     # Input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_location', type=pathlib.Path, default='../../../Data',
+    parser.add_argument('--data_location', type=pathlib.Path, default='../../Data',
                         help='Path to input and target images')
-    parser.add_argument('--workdir', type=pathlib.Path, default='../../../workdir/',
+    parser.add_argument('--workdir', type=pathlib.Path, default='../../Workdir/',
                         help='Path for saving the experiment logs and segmentation models')
     parser.add_argument('--experiment', type=pathlib.Path, default='../experiments/run',
                         help='Path to experiment files for training (all experiments are conducted)')
     parser.add_argument('--ID_char', type=str, default='_',
                         help='Separator for the subject ID and image name')
-    parser.add_argument('--ID_split', type=int, default=4,
+    parser.add_argument('--ID_split', type=int, default=2,
                         help='Count of the ID_char to split the subject ID')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed to allow consistent experiments (e.g. for random augmentations)')
-    parser.add_argument('--num_threads', type=int, default=16,
-                        help='Number of CPUs for parallel processing')
+    parser.add_argument('--num_threads', type=int, default=0,
+                        help='Number of CPUs for parallel processing. Set to 0 when working on Windows!')
     parser.add_argument('--gpus', type=int, default=2,
                         help='Number of GPUs for model training')
     args = parser.parse_args()
@@ -201,6 +203,12 @@ def create_data_provider(args, config, parser, metadata, mean, std):
     return DataProvider(item_loaders)
 
 
+def parse_binary_label(x, threshold=0.5):
+    out = x.gt(threshold)
+    #return torch.cat((~out, out), dim=1).squeeze().float()
+    return out.squeeze().float()
+
+
 def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
     """
     Loader function for grayscale images.
@@ -221,11 +229,12 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
     img = img.permute(2, 0, 1)  # img.shape[0] is the color channel after permute
 
     # Debugging
-    if debug:
-        plt.imshow(np.asarray(img).transpose((1, 2, 0)))
+    """
+    if debug and uniform(0, 1) > 0.95:
+        plt.imshow(np.asarray(img[0, :, :]), cmap='gray')
         plt.imshow(np.ma.masked_array(mask * 255, mask == 0).squeeze(), cmap='autumn', alpha=0.3)
         plt.show()
-
+    """
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
     return {data_key: img, target_key: mask}

@@ -30,8 +30,8 @@ def build_meta_from_files(base_path, phase='train'):
     res = masks.intersection(images)
 
     #masks = list(map(lambda x: pathlib.Path(x).with_suffix('.png'), masks))
-    images = list(map(lambda x: pathlib.Path(x.name), images_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    masks = list(map(lambda x: pathlib.Path(x.name), masks_loc.glob('**/*[0-9].[pb][nm][gp]')))
+    images = list(map(lambda x: pathlib.Path(x), images_loc.glob('**/*[0-9].[pb][nm][gp]')))
+    masks = list(map(lambda x: pathlib.Path(x), masks_loc.glob('**/*[0-9].[pb][nm][gp]')))
     images.sort()
     masks.sort()
 
@@ -40,13 +40,8 @@ def build_meta_from_files(base_path, phase='train'):
     d_frame = {'fname': [], 'mask_fname': []}
 
     # Making dataframe
-    if str(base_path)[-3:] == 'µCT':
-
-        [d_frame['fname'].append((images_loc / str(img_name).rsplit('_', 1)[0] / img_name)) for img_name in images]
-        [d_frame['mask_fname'].append(masks_loc / str(img_name).rsplit('_', 1)[0] / img_name) for img_name in masks]
-    else:
-        [d_frame['fname'].append((images_loc / img_name)) for img_name in images]
-        [d_frame['mask_fname'].append(masks_loc / img_name) for img_name in masks]
+    [d_frame['fname'].append((img_name)) for img_name in images]
+    [d_frame['mask_fname'].append(img_name) for img_name in masks]
 
     metadata = pd.DataFrame(data=d_frame)
 
@@ -71,7 +66,9 @@ def build_splits(data_dir, args, config, parser, snapshots_dir, snapshot_name):
     # Metadata
     metadata = build_meta_from_files(data_dir)
     # Group_ID
-    metadata['subj_id'] = metadata.fname.apply(lambda x: '_'.join(x.stem.split(args.ID_char, args.ID_split)[:-1]), 0)
+    metadata['subj_id'] = metadata.fname.apply(lambda x: x.parent.stem)
+    metadata['fname'] = metadata.fname.apply(lambda x: str(x))
+    metadata['mask_fname'] = metadata.mask_fname.apply(lambda x: str(x))
 
     # Mean and std
     crop = config['training']['crop_size']
