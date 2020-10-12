@@ -11,8 +11,8 @@ import numpy as np
 import scipy.ndimage as ndi
 import argparse
 
-from rabbitccs.data.utilities import load, save, print_orthogonal
-from rabbitccs.inference.thickness_analysis import _local_thickness
+from components.data.utilities import load, save, print_orthogonal
+from components.inference.thickness_analysis import _local_thickness
 
 
 if __name__ == '__main__':

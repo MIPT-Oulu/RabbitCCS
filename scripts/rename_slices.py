@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from rabbitccs.training.session import init_experiment
+from components.training.session import init_experiment
 
 if __name__ == "__main__":
     # Initialize experiment

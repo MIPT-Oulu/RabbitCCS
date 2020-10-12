@@ -8,7 +8,7 @@ from tqdm import tqdm
 import argparse
 import pandas as pd
 from time import time
-from rabbitccs.data.utilities import load_images as load, save_images as save, bounding_box, print_orthogonal
+from components.data.utilities import load_images as load, save_images as save, bounding_box, print_orthogonal
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

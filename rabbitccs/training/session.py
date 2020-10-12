@@ -26,7 +26,7 @@ from collagen.callbacks.logging import ScalarMeterLogger
 from collagen.callbacks import ModelSaver, ImageMaskVisualizer, SimpleLRScheduler
 from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, SoftJaccardLoss
 
-from rabbitccs.data.transforms import train_test_transforms
+from components.data.transforms import train_test_transforms
 
 
 def init_experiment():

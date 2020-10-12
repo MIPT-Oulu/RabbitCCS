@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from rabbitccs.data.utilities import load_images as load, save_images as save, bounding_box
+from components.data.utilities import load_images as load, save_images as save, bounding_box
 from tqdm import tqdm
 import cv2
 import argparse

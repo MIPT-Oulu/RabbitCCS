@@ -5,7 +5,7 @@ import torch
 import dill
 from sklearn import model_selection
 
-from rabbitccs.data.transforms import estimate_mean_std
+from components.data.transforms import estimate_mean_std
 
 
 def build_meta_from_files(base_path, phase='train'):

@@ -3,7 +3,7 @@ training:
   experiment: 3D
   calc_meanstd: True
   parse_color: False
-  crop_size: [512, 1024]
+  crop_size: [256, 512]
   # Training
   wd: 0.0001
   lr: 0.0001

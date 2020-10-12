@@ -14,8 +14,8 @@ from tqdm import tqdm
 from glob import glob
 
 from collagen.core.utils import auto_detect_device
-from rabbitccs.inference.model_components import InferenceModel, load_models
-from rabbitccs.inference.pipeline_components import inference, largest_object
+from components.inference.model_components import InferenceModel, load_models
+from components.inference.pipeline_components import inference, largest_object
 
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy

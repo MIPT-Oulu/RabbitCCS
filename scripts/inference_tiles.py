@@ -13,10 +13,10 @@ from tqdm import tqdm
 from glob import glob
 from collagen.modelzoo.segmentation import EncoderDecoder
 from collagen.core.utils import auto_detect_device
-from rabbitccs.data.transforms import numpy2tens
-from rabbitccs.data.utilities import load_images as load, save_images as save, bounding_box
-from rabbitccs.inference.pipeline_components import inference, largest_object
-from rabbitccs.inference.model_components import InferenceModel, load_models
+from components.data.transforms import numpy2tens
+from components.data.utilities import load_images as load, save_images as save, bounding_box
+from components.inference.pipeline_components import inference, largest_object
+from components.inference.model_components import InferenceModel, load_models
 
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy

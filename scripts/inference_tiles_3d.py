@@ -15,10 +15,10 @@ from glob import glob
 from collagen.modelzoo.segmentation import EncoderDecoder
 from collagen.core.utils import auto_detect_device
 
-from rabbitccs.data.utilities import load, save, print_orthogonal
-from rabbitccs.inference.model_components import InferenceModel
-from rabbitccs.inference.pipeline_components import inference, largest_object
-from rabbitccs.data.visualizations import render_volume
+from components.data.utilities import load, save, print_orthogonal
+from components.inference.model_components import InferenceModel
+from components.inference.pipeline_components import inference, largest_object
+from components.data.visualizations import render_volume
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

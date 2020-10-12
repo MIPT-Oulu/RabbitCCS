@@ -9,7 +9,7 @@ import argparse
 import pandas as pd
 from time import time, strftime
 
-from rabbitccs.data.utilities import load, print_orthogonal
+from components.data.utilities import load, print_orthogonal
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

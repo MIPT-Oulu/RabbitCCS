@@ -12,11 +12,11 @@ from collagen.losses.segmentation import CombinedLoss, BCEWithLogitsLoss2d, Soft
 from collagen.strategies import Strategy
 
 
-from rabbitccs.training.session import create_data_provider, init_experiment, init_callbacks, save_transforms,\
+from components.training.session import create_data_provider, init_experiment, init_callbacks, save_transforms,\
     init_loss, parse_grayscale, parse_color
 
-from rabbitccs.data.splits import build_splits
-from rabbitccs.inference.pipeline_components import inference_runner_oof, evaluation_runner
+from components.data.splits import build_splits
+from components.inference.pipeline_components import inference_runner_oof, evaluation_runner
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)

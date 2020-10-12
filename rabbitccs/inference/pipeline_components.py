@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
 from pytorch_toolbelt.utils.torch_utils import tensor_from_rgb_image, to_numpy
 
-from rabbitccs.inference.model_components import InferenceModel, load_models
-from rabbitccs.data.utilities import load, print_orthogonal, print_images
+from components.inference.model_components import InferenceModel, load_models
+from components.data.utilities import load, print_orthogonal, print_images
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf
 

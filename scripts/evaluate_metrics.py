@@ -9,8 +9,8 @@ import yaml
 import pandas as pd
 from time import sleep, time
 
-from rabbitccs.data.utilities import load, print_orthogonal
-from rabbitccs.data.visualizations import render_volume
+from components.data.utilities import load, print_orthogonal
+from components.data.visualizations import render_volume
 
 from deeppipeline.segmentation.evaluation.metrics import calculate_iou, calculate_dice, \
     calculate_volumetric_similarity, calculate_confusion_matrix_from_arrays as calculate_conf

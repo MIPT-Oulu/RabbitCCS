@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='rabbitccs',
+    name='components',
     version='0.1',
     author='Santeri Rytky,Aleksei Tiulpin',
     author_email='santeri.rytky@oulu.fi',

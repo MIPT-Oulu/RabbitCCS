@@ -1,8 +1,8 @@
 import os
 import numpy as np
 from pathlib import Path
-from rabbitccs.training.session import init_experiment
-from rabbitccs.data.utilities import load, save, print_orthogonal
+from components.training.session import init_experiment
+from components.data.utilities import load, save, print_orthogonal
 from scipy.ndimage import zoom
 
 if __name__ == "__main__":
