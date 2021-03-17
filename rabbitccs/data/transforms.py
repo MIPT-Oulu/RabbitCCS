@@ -110,11 +110,12 @@ def train_test_transforms(conf, mean=None, std=None, crop_size=(512, 1024)):
                         slt.RandomRotate(rotation_range=tuple(trf['rotation_range']), p=prob),
                         slt.RandomScale(range_x=tuple(trf['scale_range']),
                                         range_y=tuple(trf['scale_range']), same=False, p=prob),
-                        slt.RandomShear(range_x=tuple(trf['shear_range']),
-                                        range_y=tuple(trf['shear_range']), p=prob),
+                        #slt.RandomShear(range_x=tuple(trf['shear_range']),
+                        #                range_y=tuple(trf['shear_range']), p=prob),
                         slt.RandomTranslate(range_x=trf['translation_range'], range_y=trf['translation_range'], p=prob)
                     ]),
-                    v_range=tuple(trf['v_range'])),
+                    v_range=None  #tuple(trf['v_range'])
+                ),
                 # Spatial
                 slt.RandomFlip(p=prob),
                 slt.PadTransform(pad_to=crop_size),

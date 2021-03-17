@@ -8,11 +8,11 @@ import pathlib
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset_root', type=pathlib.Path,
-                    #default='/media/dios/dios2/RabbitSegmentation/µCT/images_test/8C_M1_lateral_condyle_XZ')
-                    default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL')
+                    default='/media/dios/kaappi/Santeri/RabbitSegmentation/Matched µCT/')
+                    #default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Images_CTRL')
 parser.add_argument('--mask_dir', type=pathlib.Path,
-                    #default='/media/dios/dios2/RabbitSegmentation/µCT/predictions_4fold/8C_M1_lateral_condyle_XZ/Largest')
-                    default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_CTRL')
+                    default='/media/dios/kaappi/Santeri/RabbitSegmentation/Matched µCT/Predictions_resnet18_FPN_4fold')
+                    #default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_CTRL')
 parser.add_argument('--crop', type=bool, default=False)
 parser.add_argument('--crop_method', type=str, default='bbox')
 parser.add_argument('--saved', type=bool, default=True)
@@ -53,10 +53,11 @@ if args.crop_method == 'bbox':
         data_ref = data.copy()
         for sample_id in tqdm(range(len(data)), 'Plotting'):
             img = data_ref[sample_id]
+            thickness = 2
             if args.largest:
-                cv2.drawContours(img, [contours[sample_id]], 0, (0, 0, 255), 2)
+                cv2.drawContours(img, [contours[sample_id]], 0, (0, 0, 255), thickness)
             else:
-                cv2.drawContours(img, contours[sample_id], -1, (0, 0, 255), 2)
+                cv2.drawContours(img, contours[sample_id], -1, (0, 0, 255), thickness)
 elif args.crop_method == 'value':
     for sample in range(len(mask)):
         w, h = mask[sample].shape
@@ -68,7 +69,8 @@ elif args.crop_method == 'value':
 # Save images
 if args.saved:
     #save_im = '/media/dios/dios2/HistologySegmentation/Images_cropped2'
-    save_im_ref = '/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_contour'
+    #save_im_ref = '/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_contour'
+    save_im_ref = '/media/santeri/data/RabbitSegmentation/workdir/results/µCT RN18FPN 2'
     #save_mask = '/media/dios/dios2/HistologySegmentation/Masks_cropped2'
     save_im = str(args.dataset_root / 'crop')
     save_mask = str(args.mask_dir / 'crop')

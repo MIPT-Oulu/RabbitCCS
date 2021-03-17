@@ -27,19 +27,19 @@ cv2.setNumThreads(0)
 
 if __name__ == "__main__":
     start = time()
+    snap = 'dios-erc-gpu_2020_04_23_13_58_05_2D_resnet18_UNet'
+    threshold = 0.8
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/New folder')
-    parser.add_argument('--save_dir', type=Path, default='/media/dios/dios2/RabbitSegmentation/Histology/Rabbits/Predictions_resnet34_UNet_4fold_extra')
-    parser.add_argument('--bs', type=int, default=4)
+    parser.add_argument('--dataset_root', type=Path, default='/media/dios/dios2/RabbitSegmentation/µCT/Matched histology')
+    parser.add_argument('--save_dir', type=Path, default=f'/media/santeri/data/RabbitSegmentation/Data/predictions/{snap}')
+    parser.add_argument('--bs', type=int, default=8)
     parser.add_argument('--gpus', type=int, default=2)
     parser.add_argument('--despeckle', type=int, default=500)  # Give None to leave the largest object
     parser.add_argument('--plot', type=bool, default=False)
     parser.add_argument('--weight', type=str, choices=['pyramid', 'mean'], default='mean')
-    parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_04_23_13_58_05_2D_resnet34_UNet/')
-    #parser.add_argument('--snapshot', type=Path, default='../../../workdir/snapshots/dios-erc-gpu_2020_04_03_07_25_01_FPN_resnet18/')
+    parser.add_argument('--snapshot', type=Path, default=f'../../../workdir/snapshots/{snap}/')
     args = parser.parse_args()
-    threshold = 0.5
 
     # Load snapshot configuration
     with open(args.snapshot / 'config.yml', 'r') as f:

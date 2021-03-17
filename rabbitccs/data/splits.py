@@ -25,28 +25,22 @@ def build_meta_from_files(base_path, phase='train'):
         images_loc = base_path / 'images_test'
 
     # List files
-    images = set(map(lambda x: x.stem, images_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    masks = set(map(lambda x: x.stem, masks_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    res = masks.intersection(images)
-
-    #masks = list(map(lambda x: pathlib.Path(x).with_suffix('.png'), masks))
-    images = list(map(lambda x: pathlib.Path(x.name), images_loc.glob('**/*[0-9].[pb][nm][gp]')))
-    masks = list(map(lambda x: pathlib.Path(x.name), masks_loc.glob('**/*[0-9].[pb][nm][gp]')))
+    images = list(map(lambda x: pathlib.Path(x), images_loc.glob('**/*[0-9].[pb][nm][gp]')))
+    masks = list(map(lambda x: pathlib.Path(x), masks_loc.glob('**/*[0-9].[pb][nm][gp]')))
     images.sort()
     masks.sort()
 
-    assert len(res), len(masks)
+    assert len(images), len(masks)
 
     d_frame = {'fname': [], 'mask_fname': []}
 
     # Making dataframe
     if str(base_path)[-3:] == 'µCT':
-
-        [d_frame['fname'].append((images_loc / str(img_name).rsplit('_', 1)[0] / img_name)) for img_name in images]
-        [d_frame['mask_fname'].append(masks_loc / str(img_name).rsplit('_', 1)[0] / img_name) for img_name in masks]
+        [d_frame['fname'].append((images_loc / img_name.parent / img_name.name)) for img_name in images]
+        [d_frame['mask_fname'].append(masks_loc / img_name.parent / img_name.name) for img_name in masks]
     else:
-        [d_frame['fname'].append((images_loc / img_name)) for img_name in images]
-        [d_frame['mask_fname'].append(masks_loc / img_name) for img_name in masks]
+        [d_frame['fname'].append((images_loc / img_name.name)) for img_name in images]
+        [d_frame['mask_fname'].append(masks_loc / img_name.name) for img_name in masks]
 
     metadata = pd.DataFrame(data=d_frame)
 

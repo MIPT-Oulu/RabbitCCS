@@ -21,9 +21,12 @@ class InferenceModel(nn.Module):
 
     def forward(self, x):
         res = 0
+        preds = []
         for idx in range(self.n_folds):
             fold = self.__dict__['_modules'][f'fold_{idx}']
-            res += fold(x).sigmoid()
+            pred = fold(x).sigmoid()
+            res += pred
+            preds.append(pred)
 
         return res / self.n_folds
 

@@ -221,8 +221,9 @@ def parse_grayscale(root, entry, transform, data_key, target_key, debug=False):
     img = img.permute(2, 0, 1)  # img.shape[0] is the color channel after permute
 
     # Debugging
-    if debug:
-        plt.imshow(np.asarray(img).transpose((1, 2, 0)))
+    if debug and np.random.uniform(0, 1) > 0.98:
+        plt.imshow(img.numpy().transpose((1, 2, 0)) / 255., cmap='gray')
+        plt.colorbar()
         plt.imshow(np.ma.masked_array(mask * 255, mask == 0).squeeze(), cmap='autumn', alpha=0.3)
         plt.show()
 
@@ -257,6 +258,11 @@ def parse_color(root, entry, transform, data_key, target_key, debug=False):
     # Images are in the format 3xHxW
     # and scaled to 0-1 range
     return {data_key: img, target_key: mask}
+
+
+def parse_binary_label(x, threshold=0.5):
+    out = x.gt(threshold)
+    return out.squeeze().float()
 
 
 def save_config(path, config, args):
