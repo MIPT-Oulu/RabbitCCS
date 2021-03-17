@@ -30,7 +30,7 @@ conda env create -f environment.yml
 For 2D data, just add the images to the corresponding folders, making sure that the image and mask names match.
 For 3D data, create a subfolder for each scan (sample name for the folder), and include the slices in the subfolder.
 
-- Set the path name for training data in [session.py](../blob/master/rabbitccs/training/session.py) (`init_experiment()` function)
+- Set the path name for training data in [session.py](../master/rabbitccs/training/session.py) (`init_experiment()` function)
 
 - Create a configuration file to the `experiments/run` folder. Four example experiments are included. 
 All experiments are conducted subsequently during training.
