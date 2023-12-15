@@ -57,3 +57,19 @@ In such cases, slice-by slice thickness analysis or external software is recomme
 ## License
 
 This software is released under the Creative commons license (CC-BY).
+
+## Citation
+If you use the source code in your work, please cite [our paper.](https://doi.org/10.1111/joa.13435)
+
+```
+@article {Rytky13453,
+title = {Automated analysis of rabbit knee calcified cartilage morphology using micro-computed tomography and deep learning},
+author = {Rytky, S.J.O. and Huang, L. and Tanska, P. and Tiulpin, A. and Panfilov, E. and Herzog, W. and Korhonen, R.K. and Saarakkala, S. and Finnil{\"a}, M.A.J.},
+journal = {Journal of Anatomy}
+volume = {239},
+number = {2},
+pages = {251-263},
+doi = {https://doi.org/10.1111/joa.13435},
+year = {2021},
+}
+```
