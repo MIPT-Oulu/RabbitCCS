@@ -13,7 +13,7 @@ This repository is used to create deep learning segmentation models for identify
 in rabbit histopathological images. 
 The method is used for segmentation of 2D histological color images and 3D micro-computed tomography images (slice-by-slice).
 For detailed description of the method and example of the results, please refer to the publication: 
-[Rytky SJO, et al. Automated analysis of rabbit knee calcified cartilage morphology using micro-computed tomography](https://doi.org/10.1111/joa.13435/)
+[Rytky SJO, et al. Automated analysis of rabbit knee calcified cartilage morphology using micro-computed tomography](https://doi.org/10.1111/joa.13435)
 
 ## Prerequisites
 
